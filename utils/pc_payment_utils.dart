@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'dart:math';
 import 'package:intl/intl.dart';
@@ -11,8 +10,6 @@ import 'package:url_launcher/url_launcher_string.dart';
 
 String? gid; // Declare gid to avoid compilation error
 
-// String get jwtPaymentUrl => 'http://localhost:3000/api/pay/jwt';
-
 String generateMerchantTxnId() {
   final timestamp = DateTime.now().millisecondsSinceEpoch;
   final random = Random();
@@ -20,10 +17,13 @@ String generateMerchantTxnId() {
   return '$timestamp$randomDigits';
 }
 
+////////////////////////////JWT Payment Handlers////////////////////////////////
+
 Future<void> handlePcJwtPayment(
   String amount, // Changed to String
   String currency,
   BuildContext context,
+  // {Map<String, dynamic>? payload} // Optional payload parameter
 ) async {
   try {
     final merchantTxnId = generateMerchantTxnId();
@@ -80,6 +80,75 @@ Future<void> handlePcJwtPayment(
   }
 }
 
+//*********************************************************************************************//
+
+Future<void> handlePdJwtPayment(BuildContext context, payload) async {
+  try {
+    final merchantTxnId = generateMerchantTxnId();
+    final mergedPayload = {
+      "merchantTxnId": merchantTxnId,
+      ...payload,
+      "merchantCallbackURL":
+          "https://api.uat.payglocal.in/gl/v1/payments/merchantCallback",
+    };
+
+    const encoder = JsonEncoder.withIndent('  ');
+    print('handlePdJwtPayment payload:\n${encoder.convert(mergedPayload)}');
+
+    final response = await http
+        .post(
+          Uri.parse(jwtPaymentUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(mergedPayload),
+        )
+        .timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Request timed out');
+          },
+        );
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      final paymentLink = responseData['payment_link'];
+      gid = responseData['gid'];
+
+      if (paymentLink == null || paymentLink.isEmpty) {
+        throw Exception('No payment link received');
+      }
+
+      final paymentUri = Uri.parse(paymentLink);
+      if (await canLaunchUrl(paymentUri)) {
+        await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
+      } else {
+        throw Exception('Could not launch payment link');
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Payment Initiated! Redirecting...',
+            style: GoogleFonts.inter(color: Colors.white),
+          ),
+          backgroundColor: const Color(0xFF5E35B1),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      throw Exception('Payment request failed: ${response.statusCode}');
+    }
+  } catch (error) {
+    print('Unexpected error: $error');
+    throw Exception('Error: $error');
+  }
+}
+
+////////////////////////////JWT Payment Handlers////////////////////////////////
+
+
+
+
+///////////// Standing Instruction Payment Handlers//////////////////////////////
 
 final String startDate = DateFormat('yyyyMMdd').format(DateTime.now());
 
@@ -99,13 +168,13 @@ Future<void> handlePcFixedSIPayment(
           "numberOfPayments": "12",
           "frequency": "MONTHLY",
           "type": "FIXED",
-          "startDate": startDate,
+          "startDate": "20250801" ,
         },
       },
       "merchantCallbackURL":
           "https://api.uat.payglocal.in/gl/v1/payments/merchantCallback",
     };
- print(payload);
+    print(payload);
     final response = await http
         .post(
           Uri.parse(siPaymentUrl),
@@ -152,14 +221,76 @@ Future<void> handlePcFixedSIPayment(
   }
 }
 
+Future<void> handlePdFixedSIPayment(payload, BuildContext context) async {
+  try {
+    final merchantTxnId = generateMerchantTxnId();
+    final finalPayload = {
+      "merchantTxnId": merchantTxnId,
+      ...payload,
+      'standingInstruction': {
+        'data': {
+          'amount': payload['paymentData']['totalAmount'],
+          'numberOfPayments': "12",
+          'frequency': 'MONTHLY',
+          'type': 'FIXED',
+          'startDate': "20250801" 
+        },
+      },
+      "merchantCallbackURL":
+          "https://api.uat.payglocal.in/gl/v1/payments/merchantCallback",
+    };
+    
+    print(finalPayload);
+    final response = await http
+        .post(
+          Uri.parse(siPaymentUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(finalPayload),
+        )
+        .timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Request timed out');
+          },
+        );
 
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      final paymentLink = responseData['payment_link'];
+      gid = responseData['gid'];
+      if (paymentLink == null || paymentLink.isEmpty) {
+        throw Exception('No payment link received');
+      }
+
+      final paymentUri = Uri.parse(paymentLink);
+      if (await canLaunchUrl(paymentUri)) {
+        await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
+      } else {
+        throw Exception('Could not launch payment link');
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Payment Initiated! Redirecting...',
+            style: GoogleFonts.inter(color: Colors.white),
+          ),
+          backgroundColor: const Color(0xFF5E35B1),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  } catch (error) {
+    print('Unexpected error: $error');
+    throw Exception('Error: $error');
+  }
+}
 
 Future<void> handlePcVariableSIPayment(
-  String amount, 
+  String amount,
   BuildContext context,
 ) async {
   try {
-    
     final merchantTxnId = generateMerchantTxnId();
     final payload = {
       "merchantTxnId": merchantTxnId,
@@ -222,135 +353,235 @@ Future<void> handlePcVariableSIPayment(
   }
 }
 
-// Future<void> handlePcSIPayment()async{
+Future<void> handlePdVariableSIPayment(
+  cardNumber,
+  String expiry,
+  String cvv,
+  String bill,
+  BuildContext context,
 
-// }
+  
+) async {
+  try {
+    final merchantTxnId = generateMerchantTxnId();
+    final finalPayload = {
+      "merchantTxnId": merchantTxnId,
+      "paymentData": {
+        "totalAmount": bill,
+        "txnCurrency": 'INR',
+        'cardData': {
+            'number': cardNumber.toString(),
+            'expiryMonth': "12",
+            'expiryYear': "30",
+            'securityCode': cvv,
+          },
+      },
+      'standingInstruction': {
+        'data': {
+          'maxAmount': bill,
+          'numberOfPayments': "12",
+          'frequency': 'MONTHLY',
+          'type': 'VARIABLE',
+        },
+      },
+      "merchantCallbackURL":
+          "https://api.uat.payglocal.in/gl/v1/payments/merchantCallback",
+    };
+    
+    print(finalPayload);
+    final response = await http
+        .post(
+          Uri.parse(siPaymentUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(finalPayload),
+        )
+        .timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Request timed out');
+          },
+        );
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      final paymentLink = responseData['payment_link'];
+      gid = responseData['gid'];
+
+      if (paymentLink == null || paymentLink.isEmpty) {
+        throw Exception('No payment link received');
+      }
+
+      final paymentUri = Uri.parse(paymentLink);
+      if (await canLaunchUrl(paymentUri)) {
+        await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
+      } else {
+        throw Exception('Could not launch payment link');
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Payment Initiated! Redirecting...',
+            style: GoogleFonts.inter(color: Colors.white),
+          ),
+          backgroundColor: const Color(0xFF5E35B1),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  } catch (error) {
+    print('Unexpected error: $error');
+    throw Exception('Error: $error');
+  }
+}
 
 
-// Future<void> handlePcAuthPayment(
-//   String amount, // Changed to String for consistency
-//   String currency,
-//   BuildContext context,
-// ) async {
-//   try {
-//     final merchantTxnId = generateMerchantTxnId();
-//     final payload = {
-//       "merchantTxnId": merchantTxnId,
-//       "captureTxn": false,
-//       "paymentData": {"totalAmount": amount, "txnCurrency": currency},
-//       "merchantCallbackURL":
-//           "https://api.uat.payglocal.in/gl/v1/payments/merchantCallback",
-//     };
-//     print(payload);
-//     final response = await http
-//         .post(
-//           Uri.parse(authUrl),
-//           headers: {'Content-Type': 'application/json'},
-//           body: jsonEncode(payload),
-//         )
-//         .timeout(
-//           const Duration(seconds: 10),
-//           onTimeout: () {
-//             throw Exception('Request timed out');
-//           },
-//         );
+///////////// Standing Instruction Payment Handlers//////////////////////////////
 
-//     if (response.statusCode == 200) {
-//       final responseData = jsonDecode(response.body);
-//       final paymentLink = responseData['payment_link'];
-//       gid = responseData['gid'];
+Future<void> handleAuthPayment(
+  BuildContext context,
+  Map<String, dynamic> paymentData,
+) async {
+  try {
+    final merchantTxnId = generateMerchantTxnId();
+    final payload = {
+      "merchantTxnId": merchantTxnId,
+      "captureTxn": false,
+      "paymentData": paymentData['paymentData'],
+      "riskData": paymentData['riskData'],
+      "merchantCallbackURL":
+          "https://api.uat.payglocal.in/gl/v1/payments/merchantCallback",
+    };
 
-//       if (paymentLink == null || paymentLink.isEmpty) {
-//         throw Exception('No payment link received');
-//       }
+    const encoder = JsonEncoder.withIndent('  ');
+    print('handleAuthPayment payload:\n${encoder.convert(payload)}');
+    final response = await http
+        .post(
+          Uri.parse(authUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(payload),
+        )
+        .timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Request timed out');
+          },
+        );
 
-//       final paymentUri = Uri.parse(paymentLink);
-//       if (await canLaunchUrl(paymentUri)) {
-//         await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
-//       } else {
-//         throw Exception('Could not launch payment link');
-//       }
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      final paymentLink = responseData['payment_link'];
+      gid = responseData['gid'];
 
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(
-//           content: Text(
-//             'Payment Initiated! Redirecting...',
-//             style: GoogleFonts.inter(color: Colors.white),
-//           ),
-//           backgroundColor: const Color(0xFF5E35B1),
-//           behavior: SnackBarBehavior.floating,
-//         ),
-//       );
-//     }
-//   } catch (error) {
-//     print('Unexpected error: $error');
-//     throw Exception('Error: $error');
-//   }
-// }
+      if (paymentLink == null || paymentLink.isEmpty) {
+        throw Exception('No payment link received');
+      }
 
-//  Future<void> handlePcAuthPayment(
-//   Map<String, dynamic>flighData, 
-//    BuildContext context,
-// ) async {
-//   try {
+      final paymentUri = Uri.parse(paymentLink);
+      if (await canLaunchUrl(paymentUri)) {
+        await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
+      } else {
+        throw Exception('Could not launch payment link');
+      }
 
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Payment Initiated! Redirecting...',
+            style: GoogleFonts.inter(color: Colors.white),
+          ),
+          backgroundColor: const Color(0xFF5E35B1),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      throw Exception('Payment request failed: ${response.statusCode}');
+    }
+  } catch (error) {
+    print('Unexpected error: $error');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Payment failed: $error',
+          style: GoogleFonts.inter(color: Colors.white),
+        ),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    throw Exception('Error: $error');
+  }
+}
 
-// for (int i = 0; i < flighData.length; i++) {
-//   print('Flight ${i + 1}:');
-//   flighData[i].forEach((key, value) {
-//     print('  $key: $value');
-//   });
-// }
-//        final payload = {
-//       "merchantTxnId": 123454323456,
-//       "captureTxn": false,
-//       "paymentData": {"totalAmount": 1232, "txnCurrency": 'INR'},
-//       // "riskData": riskData,
-//       "merchantCallbackURL":
-//           "https://api.uat.payglocal.in/gl/v1/payments/merchantCallback",
-//     };
+Future<void> handlePdAuthPayment(
+  BuildContext context,
+  Map<String, dynamic> paymentData,
+) async {
+  try {
+    final merchantTxnId = generateMerchantTxnId();
+    final payload = {
+      "merchantTxnId": merchantTxnId,
+      "captureTxn": false,
+      "paymentData": paymentData['paymentData'],
+      "riskData": paymentData['riskData'],
+      "merchantCallbackURL":
+          "https://api.uat.payglocal.in/gl/v1/payments/merchantCallback",
+    };
 
-//     // print(payload);
-//     final response = await http
-//         .post(
-//           Uri.parse(authUrl),
-//           headers: {'Content-Type': 'application/json'},
-//           body: jsonEncode(payload),
-//         )
-//         .timeout(
-//           const Duration(seconds: 10),
-//           onTimeout: () {
-//             throw Exception('Request timed out');
-//           },
-//         );
+    const encoder = JsonEncoder.withIndent('  ');
+    print('handlePdAuthPayment payload:\n${encoder.convert(payload)}');
 
-//     if (response.statusCode == 200) {
-//       final responseData = jsonDecode(response.body);
-//       final paymentLink = responseData['payment_link'];
-//       gid = responseData['gid'];
+    // Validate payload before sending
+    if (payload['paymentData'] == null || payload['riskData'] == null) {
+      throw Exception('Invalid payment data: paymentData or riskData is null');
+    }
 
-//       if (paymentLink == null || paymentLink.isEmpty) {
-//         throw Exception('No payment link received');
-//       }
+    final response = await http
+        .post(
+          Uri.parse(authUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(payload),
+        )
+        .timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Request timed out');
+          },
+        );
 
-//       final paymentUri = Uri.parse(paymentLink);
-//       if (await canLaunchUrl(paymentUri)) {
-//         await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
-//         // return {'success': true};
-//       } else {
-//         throw Exception('Could not launch payment link');
-//       }
-//     } else {
-//       throw Exception('Payment request failed: ${response.statusCode}');
-//     }
-//   } catch (error) {
-//     print('Unexpected error: $error');
-//     // return {'success': false, 'message': 'Error: $error'};
-//   }
-// }
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      final paymentLink = responseData['payment_link'];
+      gid = responseData['gid'];
 
-void handlePcAuthPayment(Map<String, dynamic> riskData, BuildContext context) {
-  // Implement payment logic here
-  print('Processing payment with riskData: $riskData');
-  // Example: Send riskData to a payment gateway API
+      if (paymentLink == null || paymentLink.isEmpty) {
+        throw Exception('No payment link received');
+      }
+
+      final paymentUri = Uri.parse(paymentLink);
+      if (await canLaunchUrl(paymentUri)) {
+        await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
+      } else {
+        throw Exception('Could not launch payment link');
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Payment Initiated! Redirecting...',
+            style: GoogleFonts.inter(color: Colors.white),
+          ),
+          backgroundColor: const Color(0xFF5E35B1),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      throw Exception(
+        'Payment request failed: ${response.statusCode} - ${response.body}',
+      );
+    }
+  } catch (error) {
+    print('Payment error: $error');
+    throw Exception('Payment error: $error');
+  }
 }

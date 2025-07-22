@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 
 class PayDirectScreen extends StatefulWidget {
   const PayDirectScreen({Key? key}) : super(key: key);
@@ -420,7 +421,7 @@ JWT-based authentication enables fast and secure direct payment initiation for P
 
 *For more details on JWT, refer to [RFC 7519](https://tools.ietf.org/html/rfc7519).*
 ''',
-                            route: '/paydirect/pd_merchant_interface',
+                            route: '/paydirect/jwt',
                             icon: Icons.lock,
                             badge: 'Direct JWT',
                             badgeColor: const Color(0xFF3B82F6),
@@ -491,7 +492,7 @@ Standing Instructions (SI) for PayDirect enable automated recurring direct payme
     "data": {
       "maxAmount": "1250.00",
       "numberOfPayments": "4",
-      "frequency": "MONTHLY",
+      "frequency": "ONDEMAND",
       "type": "VARIABLE"
     }
   },
@@ -597,7 +598,7 @@ The Standalone flow separates authorization, capture, and reversal phases, allow
 
 *Contact PayGlocal support to configure Standalone services for your account.*
 ''',
-                            route: '/paydirect/standalone',
+                            route: '/paydirect/airline',
                             icon: Icons.swap_horiz,
                             badge: 'Flexible',
                             badgeColor: const Color(0xFF10B981),
@@ -1110,293 +1111,363 @@ class _PaymentMethodCardState extends State<_PaymentMethodCard>
     );
   }
 
-  void _showDetailsDialog(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isLargeScreen = screenWidth > 800;
-    final titleFontSize = isLargeScreen ? 18.0 : 16.0;
-    final bodyFontSize = isLargeScreen ? 14.0 : 13.0;
-    final codeFontSize = isLargeScreen ? 12.0 : 11.0;
-    final iconSize = isLargeScreen ? 28.0 : 24.0;
-    final padding = isLargeScreen ? 16.0 : 12.0;
+void _showDetailsDialog(BuildContext context) {
+  final screenWidth = MediaQuery.of(context).size.width;
+  final isLargeScreen = screenWidth > 800;
+  final titleFontSize = isLargeScreen ? 18.0 : 16.0;
+  final bodyFontSize = isLargeScreen ? 14.0 : 13.0;
+  final codeFontSize = isLargeScreen ? 12.0 : 11.0;
+  final iconSize = isLargeScreen ? 28.0 : 24.0;
+  final padding = isLargeScreen ? 16.0 : 12.0;
 
-    List<Map<String, String>> payloads = [];
-    RegExp payloadRegex = RegExp(r'```json\n([\s\S]*?)\n```', multiLine: true);
-    Iterable<Match> payloadMatches = payloadRegex.allMatches(widget.details);
-    for (var match in payloadMatches) {
-      String? payload = match.group(1)?.trim();
-      if (payload != null) {
-        payloads.add({
-          'content': payload,
-          'label': payloads.isEmpty
-              ? 'Sample Payload'
-              : widget.title.contains('SI PayDirect')
-                  ? (payloads.length == 0
-                      ? 'Fixed SI Payload'
-                      : 'Variable SI Payload')
-                  : widget.title.contains('Auth & Capture')
-                      ? (payloads.length == 0
-                          ? 'Authorization Payload'
-                          : payloads.length == 1
-                              ? 'Authorization Response'
-                              : payloads.length == 2
-                                  ? 'Capture Payload'
-                                  : 'Reversal Payload')
-                      : 'Sample Payload',
-        });
+  // Replace "startDate": "20220510" with current date
+  final now = DateTime.now();
+  final formattedDate = DateFormat('yyyyMMdd').format(now);
+  String updatedDetails = widget.details.replaceAll(
+    '"startDate": "20220510"',
+    '"startDate": "$formattedDate"',
+  );
+
+  // Define response JSONs
+  final Map<String, String> responses = {
+    'JWT PayDirect': '''{
+  "gid": "gl_o-962989f8777c7ff29lo0Yd5X2",
+  "status": "INPROGRESS",
+  "message": "Transaction Created Successfully",
+  "timestamp": "21/07/2025 14:35:51",
+  "reasonCode": "GL-201-001",
+  "data": {
+    "redirectUrl": "https://api.uat.payglocal.in/gl/payflow-ui/?x-gl-token=eyJpc3N1ZWQtYnkiOiJHbG9jYWwiLCJpcy1kaWdlc3RlZCI6ImZhbHNlIiwiYWxnIjoiUlMyNTYiLCJraWQiOiJrSWQtRU5oN3Y1bLdTNE56YjhScCJ9.eyJ4LWdsLW9yZGVySWQiOiJnbF9vLTk2Mjk4OWY4Nzc3YzdmZjI5bG8wWWQ1WDIiLCJhbXBsaWZpZXItbWlkIjpudWxsLCJpYXQiOiIxNzUzMDg4NzUxNTg1IiwieC1nbC1lbmMiOiJ0cnVlIiwieC1nbC1naWQiOiJnbF85NjI5ODlmODc3N2M3ZmYyNWU5bG8wWWQ1WDIiLCJ4LWdsLW1lcmNoYW50SWQiOiJ0ZXN0bmV3Z2NjMjYifQ.nTeZces9c7oltT5ohLiUoUyfBrYxcWmgCXMnqkrznp93yWurisSvqm-cgr0JoGBcZHtxiAvoQsNF116ATHqxj5-3blNkjc8um0ET47g5Qf8-Cv9QcBlL6F62Q_UYZEW6-wxGz3Jwu4IoPboGzVpxP815vCJ91cXKSaesRYumaVR7Ix9ToIAuBdSo-IUR9kJ6fGcXb6ujH4ubUDTytqPGAHyoZj6SptnsSp8yRhs-V_I2peaWzDmzXXSRHlfXTXaaSsDUHW1r4Vb1KqKejV9b7fSQ_8mcpEAGLRFSKbZvbwgSDgB0j6nxE4Qa34AxCqDT13G3NNbhdCgv0mZAX3sWzA",
+    "statusUrl": "https://api.uat.payglocal.in/gl/v1/payments/gl_o-962989f8777c7ff29lo0Yd5X2/status?x-gl-token=eyJpc3N1ZWQtYnkiOiJHbG9jYWwiLCJpcy1kaWdlc3RlZCI6ImZhbHNlIiwiYWxnIjoiUlMyNTYiLCJraWQiOiJrSWQtRU5oN3Y1bLdTNE56YjhScCJ9.eyJ4LWdsLW9yZGVySWQiOiJnbF9vLTk2Mjk4OWY4Nzc3YzdmZjI5bG8wWWQ1WDIiLCJhbXBsaWZpZXItbWlkIjpudWxsLCJpYXQiOiIxNzUzMDg4NzUxNTg1IiwieC1nbC1lbmMiOiJ0cnVlIiwieC1nbC1naWQiOiJnbF85NjI5ODlmODc3N2M3ZmYyNWU5bG8wWWQ1WDIiLCJ4LWdsLW1lcmNoYW50SWQiOiJ0ZXN0bmV3Z2NjMjYifQ.nTeZces9c7oltT5ohLiUoUyfBrYxcWmgCXMnqkrznp93yWurisSvqm-cgr0JoGBcZHtxiAvoQsNF116ATHqxj5-3blNkjc8um0ET47g5Qf8-Cv9QcBlL6F62Q_UYZEW6-wxGz3Jwu4IoPboGzVpxP815vCJ91cXKSaesRYumaVR7Ix9ToIAuBdSo-IUR9kJ6fGcXb6ujH4ubUDTytqPGAHyoZj6SptnsSp8yRhs-V_I2peaWzDmzXXSRHlfXTXaaSsDUHW1r4Vb1KqKejV9b7fSQ_8mcpEAGLRFSKbZvbwgSDgB0j6nxE4Qa34AxCqDT13G3NNbhdCgv0mZAX3sWzA",
+    "merchantTxnId": "1753088750965749238"
+  },
+  "errors": null
+}''',
+    'SI PayDirect_Fixed': '''{
+  "gid": "gl_o-96298b9a848a0553fjo00HwX2",
+  "status": "INPROGRESS",
+  "message": "Transaction Created Successfully",
+  "timestamp": "21/07/2025 14:36:58",
+  "reasonCode": "GL-201-001",
+  "data": {
+    "redirectUrl": "https://api.uat.payglocal.in/gl/payflow-ui/?x-gl-token=eyJpc3N1ZWQtYnkiOiJHbG9jYWwiLCJpcy1kaWdlc3RlZCI6ImZhbHNlIiwiYWxnIjoiUlMyNTYiLCJraWQiOiJrSWQtRU5oN3Y1bLdTNE56YjhScCJ9.eyJ4LWdsLW9yZGVySWQiOiJnbF9vLTk2Mjk4YjlhODQ4YTA1NTNmam8wMEh3WDIiLCJhbXBsaWZpZXItbWlkIjpudWxsLCJpYXQiOiIxNzUzMDg4ODE4NDI3IiwieC1nbC1lbmMiOiJ0cnVlIiwieC1nbC1naWQiOiJnbF85NjI5OGI5YTg0OGEwNTUzNjY5am8wMEh3WDIiLCJ4LWdsLW1lcmNoYW50SWQiOiJ0ZXN0nmV3Z2NjMjYifQ.nVeNEP2ks_ixzcA0hXg-SeyFPv7LWX12q7oVl5WGSqytYzQBPy8H050VvbWWzz1tzizFTPBZf242A3DVhTG6JlS5344toykzxjCxtM4fDZcJpnVT0t6hXycyTx2qbgHlTgFineb8o6MlcQPaO-0XgylebxWfTBconrwLaRbN2CDWJt6yaVALpEbOpziZ8b_Yk1LTALiv_pq_A7j7nK1hl9xDjROCv9Y9b58-gUiO4Li1hUaAaT-GREDMqd0gv_gVeYQ7elG0zeshQeL3_mYamM06ZPRJGLzxKDUPwYK0S8KQBoY_pT7dim8cVV7UTHHKLsOaPG77uHZKJgDwYYz0qg",
+    "statusUrl": "https://api.uat.payglocal.in/gl/v1/payments/gl_o-96298b9a848a0553fjo00HwX2/status?x-gl-token=eyJpc3N1ZWQtYnkiOiJHbG9jYWwiLCJpcy1kaWdlc3RlZCI6ImZhbHNlIiwiYWxnIjoiUlMyNTYiLCJraWQiOiJrSWQtRU5oN3Y1bLdTNE56YjhScCJ9.eyJ4LWdsLW9yZGVySWQiOiJnbF9vLTk2Mjk4YjlhODQ4YTA1NTNmam8wMEh3WDIiLCJhbXBsaWZpZXItbWlkIjpudWxsLCJpYXQiOiIxNzUzMDg4ODE4NDI3IiwieC1nbC1lbmMiOiJ0cnVlIiwieC1nbC1naWQiOiJnbF85NjI5OGI5YTg0OGEwNTUzNjY5am8wMEh3WDIiLCJ4LWdsLW1lcmNoYW50SWQiOiJ0ZXN0nmV3Z2NjMjYifQ.nVeNEP2ks_ixzcA0hXg-SeyFPv7LWX12q7oVl5WGSqytYzQBPy8H050VvbWWzz1tzizFTPBZf242A3DVhTG6JlS5344toykzxjCxtM4fDZcJpnVT0t6hXycyTx2qbgHlTgFineb8o6MlcQPaO-0XgylebxWfTBconrwLaRbN2CDWJt6yaVALpEbOpziZ8b_Yk1LTALiv_pq_A7j7nK1hl9xDjROCv9Y9b58-gUiO4Li1hUaAaT-GREDMqd0gv_gVeYQ7elG0zeshQeL3_mYamM06ZPRJGLzxKDUPwYK0S8KQBoY_pT7dim8cVV7UTHHKLsOaPG77uHZKJgDwYYz0qg",
+    "mandateId": "md_ff793ab6-b4ff-46c7-927e-ac4676ce8ff6",
+    "merchantTxnId": "1753088818061491727"
+  },
+  "errors": null
+}''',
+    'SI PayDirect_Variable': '''{
+  "gid": "gl_o-96298d64204ca90876lc0CJX2",
+  "status": "INPROGRESS",
+  "message": "Transaction Created Successfully",
+  "timestamp": "21/07/2025 14:38:11",
+  "reasonCode": "GL-201-001",
+  "data": {
+    "redirectUrl": "https://api.uat.payglocal.in/gl/payflow-ui/?x-gl-token=eyJpc3N1ZWQtYnkiOiJHbG9jYWwiLCJpcy1kaWdlc3RlZCI6ImZhbHNlIiwiYWxnIjoiUlMyNTYiLCJraWQiOiJrSWQtRU5oN3Y1bLdTNE56YjhScCJ9.eyJ4LWdsLW9yZGVySWQiOiJnbF9vLTk2Mjk4ZDY0MjA0Y2E5MDg3NmxjMENKWDIiLCJhbXBsaWZpZXItbWlkIjpudWxsLCJpYXQiOiIxNzUzMDg4ODkxNjg2IiwieC1nbC1lbmMiOiJ0cnVlIiwieC1nbC1naWQiOiJnbF85NjI5OGQ2NDIwNGNhOTA4MDE4NmxjMENKWDIiLCJ4LWdsLW1lcmNoYW50SWQiOiJ0ZXN0nmV3Z2NjMjYifQ.joY5aWVM7yNvytI5fHl80UE96AaWfjpBBaTIfTFM7jGEGQf-VKS4W0egNvqGUcguDOoJhve7W6SgNv4OesQT-3Q-j1-rLP-ML7Oac39n7mC1U8XwEcu8DVxVIMxAaxU-Gn-O8gB_Dt9REckHf85JNTg2SjIttlqPYeaonS5yFONsJuUeFnGHZ4YWpym7ZaAUxe-aaSVeYtB6u3tfDHeeaxv6vHPIa_3-XS2fM6vNIVY6I2F-3H3TpzIbUOYB7KAlRUrrkUy985jsFtYLdrcS8EeUhqbWYWsjveabYJAkg6y7rKjQeEVwlKrwCn4ReutRPYUibWBnRSHtzhUzgsh5Aw",
+    "statusUrl": "https://api.uat.payglocal.in/gl/v1/payments/gl_o-96298d64204ca90876lc0CJX2/status?x-gl-token=eyJpc3N1ZWQtYnkiOiJHbG9jYWwiLCJpcy1kaWdlc3RlZCI6ImZhbHNlIiwiYWxnIjoiUlMyNTYiLCJraWQiOiJrSWQtRU5oN3Y1bLdTNE56YjhScCJ9.eyJ4LWdsLW9yZGVySWQiOiJnbF9vLTk2Mjk4ZDY0MjA0Y2E5MDg3NmxjMENKWDIiLCJhbXBsaWZpZXItbWlkIjpudWxsLCJpYXQiOiIxNzUzMDg4ODkxNjg2IiwieC1nbC1lbmMiOiJ0cnVlIiwieC1nbC1naWQiOiJnbF85NjI5OGQ2NDIwNGNhOTA4MDE4NmxjMENKWDIiLCJ4LWdsLW1lcmNoYW50SWQiOiJ0ZXN0nmV3Z2NjMjYifQ.joY5aWVM7yNvytI5fHl80UE96AaWfjpBBaTIfTFM7jGEGQf-VKS4W0egNvqGUcguDOoJhve7W6SgNv4OesQT-3Q-j1-rLP-ML7Oac39n7mC1U8XwEcu8DVxVIMxAaxU-Gn-O8gB_Dt9REckHf85JNTg2SjIttlqPYeaonS5yFONsJuUeFnGHZ4YWpym7ZaAUxe-aaSVeYtB6u3tfDHeeaxv6vHPIa_3-XS2fM6vNIVY6I2F-3H3TpzIbUOYB7KAlRUrrkUy985jsFtYLdrcS8EeUhqbWYWsjveabYJAkg6y7rKjQeEVwlKrwCn4ReutRPYUibWBnRSHtzhUzgsh5Aw",
+    "mandateId": "md_79c4147d-000c-450c-8b1c-1bcbc85c0806",
+    "merchantTxnId": "1753088891331898677"
+  },
+  "errors": null
+}''',
+    'Auth & Capture': '''{
+  "gid": "gl_o-9629948614fa8826cej0fn8X2",
+  "status": "INPROGRESS",
+  "message": "Transaction Created Successfully",
+  "timestamp": "21/07/2025 14:43:03",
+  "reasonCode": "GL-201-001",
+  "data": {
+    "redirectUrl": "https://api.uat.payglocal.in/gl/payflow-ui/?x-gl-token=eyJpc3N1ZWQtYnkiOiJHbG9jYWwiLCJpcy1kaWdlc3RlZCI6ImZhbHNlIiwiYWxnIjoiUlMyNTYiLCJraWQiOiJrSWQtRU5oN3Y1bLdTNE56YjhScCJ9.eyJ4LWdsLW9yZGVySWQiOiJnbF9vLTk2Mjk5NDg2MTRmYTg4MjZjZWowZm44WDIiLCJhbXBsaWZpZXItbWlkIjpudWxsLCJpYXQiOiIxNzUzMDg5MTgzODQzIiwieC1nbC1lbmMiOiJ0cnVlIiwieC1nbC1naWQiOiJnbF85NjI5OTQ4NjE0ZmE4ODI2MjZiZWowZm44WDIiLCJ4LWdsLW1lcmNoYW50SWQiOiJ0ZXN0nmV3Z2NjMjYifQ.G1swWlXlDtM46_03GEhSajoX1cGbz150-UbMVVJgmnmQFlSDA4q7gdQtNXUVbQwHQhXaKa1lFyfpaf-V0ASQ5TI0-cqeaUQeCFLwZ-vVWzACRWPIp78OWouavWYvASXRHoBM8HiPes5XpK2DstmRH43exk69xIIvOOh-qNDelLtsHB6odA491E7QGMjDnDvR-IXuR_iFgMv_jVcPgo_AiBZgTLt6A54UDPCCJlO8m_X99-xohpVU-yNSqRD9fJOpCH-_gQekDOaXIxK4hbkKnnpiaIcvQfAGH6xV3adINpSHufErVrTKnKOP61VfysJcI6ZX7JL2a9VmHTHmXUNgRQ",
+    "statusUrl": "https://api.uat.payglocal.in/gl/v1/payments/gl_o-9629948614fa8826cej0fn8X2/status?x-gl-token=eyJpc3N1ZWQtYnkiOiJHbG9jYWwiLCJpcy1kaWdlc3RlZCI6ImZhbHNlIiwiYWxnIjoiUlMyNTYiLCJraWQiOiJrSWQtRU5oN3Y1bLdTNE56YjhScCJ9.eyJ4LWdsLW9yZGVySWQiOiJnbF9vLTk2Mjk5NDg2MTRmYTg4MjZjZWowZm44WDIiLCJhbXBsaWZpZXItbWlkIjpudWxsLCJpYXQiOiIxNzUzMDg5MTgzODQzIiwieC1nbC1lbmMiOiJ0cnVlIiwieC1nbC1naWQiOiJnbF85NjI5OTQ4NjE0ZmE4ODI2MjZiZWowZm44WDIiLCJ4LWdsLW1lcmNoYW50SWQiOiJ0ZXN0nmV3Z2NjMjYifQ.G1swWlXlDtM46_03GEhSajoX1cGbz150-UbMVVJgmnmQFlSDA4q7gdQtNXUVbQwHQhXaKa1lFyfpaf-V0ASQ5TI0-cqeaUQeCFLwZ-vVWzACRWPIp78OWouavWYvASXRHoBM8HiPes5XpK2DstmRH43exk69xIIvOOh-qNDelLtsHB6odA491E7QGMjDnDvR-IXuR_iFgMv_jVcPgo_AiBZgTLt6A54UDPCCJlO8m_X99-xohpVU-yNSqRD9fJOpCH-_gQekDOaXIxK4hbkKnnpiaIcvQfAGH6xV3adINpSHufErVrTKnKOP61VfysJcI6ZX7JL2a9VmHTHmXUNgRQ",
+    "merchantTxnId": "1753089183300784289"
+  },
+  "errors": null
+}'''
+  };
+
+  List<Map<String, String>> payloads = [];
+  RegExp payloadRegex = RegExp(r'```json\n([\s\S]*?)\n```', multiLine: true);
+  Iterable<Match> payloadMatches = payloadRegex.allMatches(updatedDetails);
+  int payloadIndex = 0;
+  for (var match in payloadMatches) {
+    String? payload = match.group(1)?.trim();
+    if (payload != null) {
+      String label;
+      if (widget.title.contains('SI PayDirect')) {
+        label = payloadIndex == 0 ? 'Fixed SI Payload' : 'Variable SI Payload';
+      } else if (widget.title.contains('Auth & Capture')) {
+        if (payloadIndex == 0) {
+          label = 'Authorization Payload';
+        } else {
+          continue; // Skip Capture Payload, Reversal Payload
+        }
+      } else {
+        label = 'Sample Payload';
       }
+      payloads.add({
+        'content': payload,
+        'label': label,
+      });
+      payloadIndex++;
+    }
+  }
+
+  List<Map<String, String>> endpoints = [];
+  RegExp endpointRegex = RegExp(
+    r'\*\*Copyable Endpoint:\*\* `(.*?)(?<!\\)`',
+    multiLine: true,
+  );
+  Iterable<Match> endpointMatches = endpointRegex.allMatches(updatedDetails);
+  int endpointIndex = 0;
+  for (var match in endpointMatches) {
+    String? endpoint = match.group(1)?.trim();
+    if (endpoint != null) {
+      String label;
+      if (widget.title.contains('SI PayDirect')) {
+        label = 'SI Endpoint';
+      } else if (widget.title.contains('Auth & Capture')) {
+        if (endpointIndex == 0) {
+          label = 'Authorization Endpoint';
+        } else {
+          continue; // Skip Capture Endpoint, Reversal Endpoint
+        }
+      } else {
+        label = 'Endpoint';
+      }
+      endpoints.add({
+        'content': endpoint,
+        'label': label,
+      });
+      endpointIndex++;
+    }
+  }
+
+  List<Widget> contentWidgets = [];
+  final lines = updatedDetails.split('\n');
+  bool inCodeBlock = false;
+
+  for (var line in lines) {
+    line = line.trim();
+    if (line.isEmpty) {
+      contentWidgets.add(const SizedBox(height: 8));
+      continue;
     }
 
-    List<Map<String, String>> endpoints = [];
-    RegExp endpointRegex = RegExp(
-      r'\*\*Copyable Endpoint:\*\* `(.*?)(?<!\\)`',
-      multiLine: true,
-    );
-    Iterable<Match> endpointMatches = endpointRegex.allMatches(widget.details);
-    for (var match in endpointMatches) {
-      String? endpoint = match.group(1)?.trim();
-      if (endpoint != null) {
-        endpoints.add({
-          'content': endpoint,
-          'label': endpoints.isEmpty
-              ? 'Endpoint'
-              : widget.title.contains('SI PayDirect')
-                  ? 'SI Endpoint'
-                  : widget.title.contains('Auth & Capture')
-                      ? (endpoints.length == 0
-                          ? 'Authorization Endpoint'
-                          : endpoints.length == 1
-                              ? 'Authorization Endpoint'
-                              : endpoints.length == 2
-                                  ? 'Capture Endpoint'
-                                  : 'Reversal Endpoint')
-                      : 'Endpoint',
-        });
-      }
+    if (line.startsWith('```json')) {
+      inCodeBlock = true;
+      continue;
+    } else if (line.startsWith('```')) {
+      inCodeBlock = false;
+      continue;
+    } else if (inCodeBlock) {
+      continue;
     }
 
-    List<Widget> contentWidgets = [];
-    final lines = widget.details.split('\n');
-    bool inCodeBlock = false;
+    if (line.startsWith('**') &&
+        line.endsWith('**') &&
+        !line.startsWith('**Copyable Endpoint:**')) {
+      contentWidgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: Text(
+            line.substring(2, line.length - 2),
+            style: GoogleFonts.poppins(
+              fontSize: titleFontSize,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF111827),
+            ),
+          ),
+        ),
+      );
+    } else if (line.startsWith('- ')) {
+      contentWidgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4.0, left: 8.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.check_circle,
+                size: isLargeScreen ? 16 : 14,
+                color: widget.badgeColor,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  line.substring(2),
+                  style: GoogleFonts.poppins(
+                    fontSize: bodyFontSize,
+                    color: const Color(0xFF4B5563),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else if (line.startsWith('*') && line.endsWith('*')) {
+      contentWidgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: Text(
+            line.substring(1, line.length - 1),
+            style: GoogleFonts.poppins(
+              fontSize: bodyFontSize,
+              fontStyle: FontStyle.italic,
+              color: const Color(0xFF4B5563),
+            ),
+          ),
+        ),
+      );
+    } else if (!line.startsWith('**Copyable Endpoint:**')) {
+      contentWidgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: Text(
+            line,
+            style: GoogleFonts.poppins(
+              fontSize: bodyFontSize,
+              color: const Color(0xFF4B5563),
+            ),
+          ),
+        ),
+      );
+    }
+  }
 
-    for (var line in lines) {
-      line = line.trim();
-      if (line.isEmpty) {
-        contentWidgets.add(const SizedBox(height: 8));
-        continue;
-      }
-
-      if (line.startsWith('```json')) {
-        inCodeBlock = true;
-        continue;
-      } else if (line.startsWith('```')) {
-        inCodeBlock = false;
-        continue;
-      } else if (inCodeBlock) {
-        continue;
-      }
-
-      if (line.startsWith('**') &&
-          line.endsWith('**') &&
-          !line.startsWith('**Copyable Endpoint:**')) {
-        contentWidgets.add(
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: Text(
-              line.substring(2, line.length - 2),
+  for (var endpoint in endpoints) {
+    contentWidgets.add(
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              endpoint['label']!,
               style: GoogleFonts.poppins(
                 fontSize: titleFontSize,
                 fontWeight: FontWeight.w600,
                 color: const Color(0xFF111827),
               ),
             ),
-          ),
-        );
-      } else if (line.startsWith('- ')) {
-        contentWidgets.add(
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4.0, left: 8.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.check_circle,
-                  size: isLargeScreen ? 16 : 14,
-                  color: widget.badgeColor,
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12.0),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Text(
+                  endpoint['content']!,
+                  style: GoogleFonts.robotoMono(
+                    fontSize: codeFontSize,
+                    color: const Color(0xFF1F2937),
+                  ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    line.substring(2),
-                    style: GoogleFonts.poppins(
-                      fontSize: bodyFontSize,
-                      color: const Color(0xFF4B5563),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                AnimatedScale(
+                  scale: _isHovered ? 1.05 : 1.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(
+                        ClipboardData(text: endpoint['content']!),
+                      )
+                          .then((_) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Endpoint copied to clipboard'),
+                          ),
+                        );
+                      }).catchError((e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Failed to copy endpoint'),
+                          ),
+                        );
+                      });
+                    },
+                    icon: Icon(
+                      Icons.copy,
+                      size: isLargeScreen ? 16 : 14,
+                      color: Colors.white,
+                    ),
+                    label: Text(
+                      'Copy ${endpoint['label']}',
+                      style: GoogleFonts.poppins(
+                        fontSize: isLargeScreen ? 14 : 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: widget.badgeColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      elevation: 2,
                     ),
                   ),
                 ),
               ],
             ),
-          ),
-        );
-      } else if (line.startsWith('*') && line.endsWith('*')) {
-        contentWidgets.add(
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: Text(
-              line.substring(1, line.length - 1),
-              style: GoogleFonts.poppins(
-                fontSize: bodyFontSize,
-                fontStyle: FontStyle.italic,
-                color: const Color(0xFF4B5563),
-              ),
-            ),
-          ),
-        );
-      } else if (!line.startsWith('**Copyable Endpoint:**')) {
-        contentWidgets.add(
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: Text(
-              line,
-              style: GoogleFonts.poppins(
-                fontSize: bodyFontSize,
-                color: const Color(0xFF4B5563),
-              ),
-            ),
-          ),
-        );
-      }
-    }
-
-    for (var endpoint in endpoints) {
-      contentWidgets.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                endpoint['label']!,
-                style: GoogleFonts.poppins(
-                  fontSize: titleFontSize,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF111827),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12.0),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Text(
-                    endpoint['content']!,
-                    style: GoogleFonts.robotoMono(
-                      fontSize: codeFontSize,
-                      color: const Color(0xFF1F2937),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  AnimatedScale(
-                    scale: _isHovered ? 1.05 : 1.0,
-                    duration: const Duration(milliseconds: 200),
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Clipboard.setData(
-                              ClipboardData(text: endpoint['content']!),
-                            )
-                            .then((_) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Endpoint copied to clipboard'),
-                                ),
-                              );
-                            })
-                            .catchError((e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Failed to copy endpoint'),
-                                ),
-                              );
-                            });
-                      },
-                      icon: Icon(
-                        Icons.copy,
-                        size: isLargeScreen ? 16 : 14,
-                        color: Colors.white,
-                      ),
-                      label: Text(
-                        'Copy ${endpoint['label']}',
-                        style: GoogleFonts.poppins(
-                          fontSize: isLargeScreen ? 14 : 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: widget.badgeColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        elevation: 2,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+          ],
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    for (var payload in payloads) {
-      contentWidgets.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                payload['label']!,
-                style: GoogleFonts.poppins(
-                  fontSize: titleFontSize,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF111827),
-                ),
+  for (var payload in payloads) {
+    bool isCopyable = widget.title == 'JWT PayDirect' ||
+        (widget.title == 'Auth & Capture' && payload['label'] == 'Authorization Payload');
+    contentWidgets.add(
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              payload['label']!,
+              style: GoogleFonts.poppins(
+                fontSize: titleFontSize,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF111827),
               ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12.0),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Text(
-                    payload['content']!,
-                    style: GoogleFonts.robotoMono(
-                      fontSize: codeFontSize,
-                      color: const Color(0xFF1F2937),
-                    ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12.0),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Text(
+                  payload['content']!,
+                  style: GoogleFonts.robotoMono(
+                    fontSize: codeFontSize,
+                    color: const Color(0xFF1F2937),
                   ),
                 ),
               ),
+            ),
+            if (isCopyable) ...[
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -1407,22 +1478,21 @@ class _PaymentMethodCardState extends State<_PaymentMethodCard>
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Clipboard.setData(
-                              ClipboardData(text: payload['content']!),
-                            )
+                          ClipboardData(text: payload['content']!),
+                        )
                             .then((_) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Payload copied to clipboard'),
-                                ),
-                              );
-                            })
-                            .catchError((e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Failed to copy payload'),
-                                ),
-                              );
-                            });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${payload['label']} copied to clipboard'),
+                            ),
+                          );
+                        }).catchError((e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Failed to copy payload'),
+                            ),
+                          );
+                        });
                       },
                       icon: Icon(
                         Icons.copy,
@@ -1454,136 +1524,243 @@ class _PaymentMethodCardState extends State<_PaymentMethodCard>
                 ],
               ),
             ],
-          ),
-        ),
-      );
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return FadeTransition(
-          opacity: _dialogFadeAnimation,
-          child: ScaleTransition(
-            scale: _dialogScaleAnimation,
-            child: AlertDialog(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              contentPadding: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+            // Add response below the payload
+            if (widget.title == 'JWT PayDirect' && payload['label'] == 'Sample Payload' ||
+                (widget.title == 'SI PayDirect' &&
+                    (payload['label'] == 'Fixed SI Payload' || payload['label'] == 'Variable SI Payload')) ||
+                (widget.title == 'Auth & Capture' && payload['label'] == 'Authorization Payload')) ...[
+              const SizedBox(height: 16),
+              Text(
+                widget.title == 'SI PayDirect'
+                    ? (payload['label'] == 'Fixed SI Payload'
+                        ? 'Fixed SI Response'
+                        : 'Variable SI Response')
+                    : '${payload['label']} Response',
+                style: GoogleFonts.poppins(
+                  fontSize: titleFontSize,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF111827),
+                ),
               ),
-              content: Container(
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12.0),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFF9FAFB), Color(0xFFE5E7EB)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Text(
+                    responses[
+                        widget.title == 'SI PayDirect'
+                            ? '${widget.title}_${payload['label'] == 'Fixed SI Payload' ? 'Fixed' : 'Variable'}'
+                            : widget.title]!,
+                    style: GoogleFonts.robotoMono(
+                      fontSize: codeFontSize,
+                      color: const Color(0xFF1F2937),
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
+                ),
+              ),
+              if (isCopyable) ...[
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    AnimatedScale(
+                      scale: _isHovered ? 1.05 : 1.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Clipboard.setData(
+                            ClipboardData(
+                              text: responses[
+                                  widget.title == 'SI PayDirect'
+                                      ? '${widget.title}_${payload['label'] == 'Fixed SI Payload' ? 'Fixed' : 'Variable'}'
+                                      : widget.title]!,
+                            ),
+                          )
+                              .then((_) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '${payload['label']} Response copied to clipboard',
+                                ),
+                              ),
+                            );
+                          }).catchError((e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Failed to copy response'),
+                              ),
+                            );
+                          });
+                        },
+                        icon: Icon(
+                          Icons.copy,
+                          size: isLargeScreen ? 16 : 14,
+                          color: Colors.white,
+                        ),
+                        label: Text(
+                          'Copy ${payload['label']} Response',
+                          style: GoogleFonts.poppins(
+                            fontSize: isLargeScreen ? 14 : 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: widget.badgeColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          elevation: 2,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: EdgeInsets.all(padding),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: widget.badgeColor.withOpacity(0.2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                widget.icon,
-                                size: iconSize,
-                                color: widget.badgeColor,
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return FadeTransition(
+        opacity: _dialogFadeAnimation,
+        child: ScaleTransition(
+          scale: _dialogScaleAnimation,
+          child: AlertDialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            contentPadding: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            content: Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFF9FAFB), Color(0xFFE5E7EB)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.all(padding),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: widget.badgeColor.withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              widget.icon,
+                              size: iconSize,
+                              color: widget.badgeColor,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              widget.title,
+                              style: GoogleFonts.poppins(
+                                fontSize: isLargeScreen ? 20 : 18,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF111827),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                widget.title,
-                                style: GoogleFonts.poppins(
-                                  fontSize: isLargeScreen ? 20 : 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF111827),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        ...contentWidgets,
-                      ],
-                    ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      ...contentWidgets,
+                    ],
                   ),
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'Close',
+                  style: GoogleFonts.poppins(
+                    fontSize: isLargeScreen ? 14 : 12,
+                    color: const Color(0xFF4B5563),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              AnimatedScale(
+                scale: _isHovered ? 1.05 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    try {
+                      Navigator.pushNamed(context, widget.route);
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('${widget.route} route not found'),
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF3B82F6),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    elevation: 2,
+                  ),
                   child: Text(
-                    'Close',
+                    'Try Now',
                     style: GoogleFonts.poppins(
                       fontSize: isLargeScreen ? 14 : 12,
-                      color: const Color(0xFF4B5563),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                AnimatedScale(
-                  scale: _isHovered ? 1.05 : 1.0,
-                  duration: const Duration(milliseconds: 200),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      try {
-                        Navigator.pushNamed(context, widget.route);
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${widget.route} route not found'),
-                          ),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF3B82F6),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      elevation: 2,
-                    ),
-                    child: Text(
-                      'Try Now',
-                      style: GoogleFonts.poppins(
-                        fontSize: isLargeScreen ? 14 : 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
+
 }
