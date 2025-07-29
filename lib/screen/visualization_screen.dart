@@ -1,5 +1,6 @@
 import 'package:centralproject/screen/paycollect_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/shared_app_bar.dart';
 
@@ -413,9 +414,9 @@ class _VisualizationScreenState extends State<VisualizationScreen>
         
         const SizedBox(height: 24),
         
-        _buildCodeSection(
-          'Payload Structure',
-          '''const payload = {
+                 _buildCodeSection(
+           'Payload Structure',
+           '''const payload = {
   merchantTxnId,        // Unique transaction ID from merchant
   paymentData,          // Complete payment information
   merchantCallbackURL   // URL for payment status updates
@@ -423,7 +424,33 @@ class _VisualizationScreenState extends State<VisualizationScreen>
 
 // Initiate payment with PayGlocal SDK
 initiateJwtPayment(payload);''',
-        ),
+         ),
+         
+         const SizedBox(height: 24),
+         
+         _buildCopyableCodeBlock(
+           'Complete Implementation Example',
+           '''// When user clicks Pay Now button
+const handlePayNow = () => {
+  const payload = {
+    merchantTxnId: "TXN_" + Date.now(),
+    paymentData: {
+      totalAmount: 1000,
+      txnCurrency: "INR",
+      cardData: {
+        number: "4111111111111111",
+        expiryMonth: "12",
+        expiryYear: "2025",
+        securityCode: "123"
+      }
+    },
+    merchantCallbackURL: "https://merchant.com/callback"
+  };
+  
+  // Pass payload to PayGlocal SDK
+  initiateJwtPayment(payload);
+};''',
+         ),
         
         const SizedBox(height: 24),
         
@@ -458,12 +485,45 @@ initiateJwtPayment(payload);''',
         
         const SizedBox(height: 24),
         
-        _buildCodeSection(
-          'SDK Function Call',
-          '''async initiateJwtPayment(params) {
+                 _buildCodeSection(
+           'SDK Function Call',
+           '''async initiateJwtPayment(params) {
   return initiateJwtPayment(params, this.config);
 }''',
-        ),
+         ),
+         
+         const SizedBox(height: 24),
+         
+         _buildCopyableCodeBlock(
+           'Complete Validation Function',
+           '''// PayGlocal SDK validation function
+validateRequiredFields(
+  {
+    merchantTxnId,
+    paymentData,
+    merchantCallbackURL,
+    'paymentData.totalAmount': paymentData?.totalAmount,
+    'paymentData.txnCurrency': paymentData?.txnCurrency,
+    'paymentData.cardData': paymentData?.cardData,
+    'paymentData.cardData.number': paymentData?.cardData?.number,
+    'paymentData.cardData.expiryMonth': paymentData?.cardData?.expiryMonth,
+    'paymentData.cardData.expiryYear': paymentData?.cardData?.expiryYear,
+    'paymentData.cardData.securityCode': paymentData?.cardData?.securityCode,
+  },
+  [
+    'merchantTxnId',
+    'paymentData',
+    'merchantCallbackURL',
+    'paymentData.totalAmount',
+    'paymentData.txnCurrency',
+    'paymentData.cardData',
+    'paymentData.cardData.number',
+    'paymentData.cardData.expiryMonth',
+    'paymentData.cardData.expiryYear',
+    'paymentData.cardData.securityCode',
+  ]
+);''',
+         ),
       ],
     );
   }
@@ -494,10 +554,32 @@ initiateJwtPayment(payload);''',
         
         const SizedBox(height: 24),
         
-        _buildCodeSection(
-          'Token Generation Call',
-          '''const jwe = await generateJWE(payload, config);''',
-        ),
+                 _buildCodeSection(
+           'Token Generation Call',
+           '''const jwe = await generateJWE(payload, config);''',
+         ),
+         
+         const SizedBox(height: 24),
+         
+         _buildCopyableCodeBlock(
+           'Complete JWE Generation Function',
+           '''async function generateJWE(payload, config) {
+  const iat = Date.now();
+  const publicKey = await pemToKey(config.payglocalPublicKey, false);
+  const payloadStr = JSON.stringify(payload);
+  
+  return await new jose.CompactEncrypt(new TextEncoder().encode(payloadStr))
+    .setProtectedHeader({
+      alg: 'RSA-OAEP-256',
+      enc: 'A128CBC-HS256',
+      iat: iat.toString(),
+      exp: 300000,
+      kid: config.publicKeyId,
+      'issued-by': config.merchantId,
+    })
+    .encrypt(publicKey);
+}''',
+         ),
       ],
     );
   }
@@ -528,10 +610,40 @@ initiateJwtPayment(payload);''',
         
         const SizedBox(height: 24),
         
-        _buildCodeSection(
-          'Token Generation Call',
-          '''const jws = await generateJWS(jwe, config);''',
-        ),
+                 _buildCodeSection(
+           'Token Generation Call',
+           '''const jws = await generateJWS(jwe, config);''',
+         ),
+         
+         const SizedBox(height: 24),
+         
+         _buildCopyableCodeBlock(
+           'Complete JWS Generation Function',
+           '''async function generateJWS(toDigest, config) {
+  const iat = Date.now();
+
+  const digest = crypto.createHash('sha256').update(toDigest).digest('base64');
+  const digestObject = {
+    digest,
+    digestAlgorithm: 'SHA-256',
+    exp: iat + 300000,
+    iat: iat.toString(),
+  };
+
+  const privateKey = await pemToKey(config.merchantPrivateKey, true);
+
+  return await new jose.SignJWT(digestObject)
+    .setProtectedHeader({
+      'issued-by': config.merchantId,
+      alg: 'RS256',
+      kid: config.privateKeyId,
+      'x-gl-merchantId': config.merchantId,
+      'x-gl-enc': 'true',
+      'is-digested': 'true',
+    })
+    .sign(privateKey);
+}''',
+         ),
       ],
     );
   }
@@ -589,7 +701,47 @@ initiateJwtPayment(payload);''',
         
         const SizedBox(height: 24),
         
-        _buildErrorCodes(),
+                 _buildErrorCodes(),
+         
+         const SizedBox(height: 24),
+         
+         _buildCopyableCodeBlock(
+           'Success Response Example',
+           '''{
+  "gid": "GL123456789",
+  "status": "SUCCESS",
+  "message": "Payment initiated successfully",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "reasonCode": "GL-200-000",
+  "data": {
+    "paymentId": "PAY_123456789",
+    "merchantTxnId": "TXN_1705315800",
+    "amount": 1000,
+    "currency": "INR",
+    "status": "PENDING",
+    "redirectUrl": "https://payglocal.com/payment/PAY_123456789"
+  },
+  "errors": {}
+}''',
+         ),
+         
+         const SizedBox(height: 16),
+         
+         _buildCopyableCodeBlock(
+           'Error Response Example',
+           '''{
+  "gid": "GL123456790",
+  "status": "FAILED",
+  "message": "Transaction declined by system",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "reasonCode": "GL-201-000",
+  "data": {},
+  "errors": {
+    "code": "DECLINED_BY_SYSTEM",
+    "description": "The transaction was declined by the payment system"
+  }
+}''',
+         ),
       ],
     );
   }
@@ -701,20 +853,162 @@ initiateJwtPayment(payload);''',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              _buildCopyButton(code),
+            ],
           ),
           const SizedBox(height: 12),
-          Text(
+          SelectableText(
             code,
             style: GoogleFonts.firaCode(
               fontSize: 14,
               color: const Color(0xFF94A3B8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCopyButton(String textToCopy) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => _copyToClipboard(textToCopy),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF3B82F6),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.copy,
+                color: Colors.white,
+                size: 16,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Copy',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _copyToClipboard(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Code copied to clipboard!',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF10B981),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCopyableCodeBlock(String title, String code) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+              border: Border(
+                bottom: BorderSide(
+                  color: const Color(0xFFE2E8F0),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1E3A8A),
+                  ),
+                ),
+                _buildCopyButton(code),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
+              color: Color(0xFF1E293B),
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              child: SelectableText(
+                code,
+                style: GoogleFonts.firaCode(
+                  fontSize: 13,
+                  color: const Color(0xFF94A3B8),
+                  height: 1.4,
+                ),
+              ),
             ),
           ),
         ],
@@ -1117,7 +1411,37 @@ initiateJwtPayment(payload);''',
           const Color(0xFF10B981),
         ),
         const SizedBox(height: 24),
-        _buildRequestDetails(),
+                 _buildRequestDetails(),
+         
+         const SizedBox(height: 24),
+         
+         _buildCopyableCodeBlock(
+           'PayCollect API Call',
+           '''// For non-PCI DSS merchants
+const response = await post(
+  `\${config.baseUrl}/gl/v1/payments/initiate/paycollect`,
+  jwe,
+  {
+    'Content-Type': 'text/plain',
+    'x-gl-token-external': jws,
+  }
+);''',
+         ),
+         
+         const SizedBox(height: 16),
+         
+         _buildCopyableCodeBlock(
+           'PayDirect API Call',
+           '''// For PCI DSS certified merchants
+const response = await post(
+  `\${config.baseUrl}/gl/v1/payments/initiate`,
+  jwe,
+  {
+    'Content-Type': 'text/plain',
+    'x-gl-token-external': jws,
+  }
+);''',
+         ),
       ],
     );
   }
