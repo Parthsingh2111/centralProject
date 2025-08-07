@@ -1,8 +1,14 @@
-
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:math';
+import 'dart:convert';
+import '../widgets/product_card.dart';
+import '../widgets/animated_payload_overlay.dart';
+import '../widgets/vertical_step_card.dart';
+import '../widgets/animated_step_card.dart';
+import '../widgets/shared_app_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -58,77 +64,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6), // Mimics bg-gray-100
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(70),
-        child: AppBar(
-          flexibleSpace: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF3B82F6), Color(0xFF1E3A8A)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
-            ),
-          ),
-          elevation: 4,
-          shadowColor: Colors.black.withOpacity(0.2),
-          title: FadeTransition(
-            opacity: _appBarFadeAnimation,
-            child: Text(
-              'PageLocal Showcase',
-              style: GoogleFonts.poppins(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: FadeTransition(
-                opacity: _appBarFadeAnimation,
-                child: ElevatedButton(
-                  onPressed: () {
-                    try {
-                      Navigator.pushNamed(context, '/services');
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Services route not found')),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF3B82F6),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    elevation: 2,
-                  ),
-                  child: Text(
-                    'Services',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF3B82F6),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.visibility),
-              tooltip: 'Visualize the Flow',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => FlowVisualizerPage()),
-                );
-              },
-            ),
-          ],
-        ),
+      appBar: SharedAppBar(
+        title: 'PayGlocal Showcase',
+        fadeAnimation: _appBarFadeAnimation,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -139,7 +77,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Hero Section
+                
                   Center(child: Text('Click "Visualize the Flow" to see the payment process')),
                   FadeTransition(
                     opacity: _fadeAnimation,
@@ -258,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         physics: const NeverScrollableScrollPhysics(),
                         childAspectRatio: 1.4,
                         children: [
-                          _ProductCard(
+                          ProductCard(
                             title: 'PayCollect',
                             description: 'Ideal for non-PCI DSS certified merchants. Collect payments securely without handling card data.',
                             details: '''
@@ -297,7 +235,7 @@ Perfect for merchants who want to avoid PCI DSS compliance. Send basic transacti
                             largeText: 'Pay',
                             isPayCollect: true,
                           ),
-                          _ProductCard(
+                          ProductCard(
                             title: 'PayDirect',
                             description: 'For PCI DSS certified merchants. Securely process card payments directly on your platform.',
                             details: '''
@@ -306,7 +244,7 @@ Designed for PCI DSS certified merchants who handle card data on their platform.
 
 **Key Features:**  
 - Requires PCI DSS compliance for card data handling.  
-- Collects billing address and device info on PayGlocal’s page for risk assessment.  
+- Collects billing address and device info on PayGlocal's page for risk assessment.  
 - Supports streamlined checkout flows.  
 
 **Sample API Request:**  
@@ -434,847 +372,213 @@ class WavePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _ProductCard extends StatefulWidget {
+class _VerticalStep {
   final String title;
   final String description;
-  final String details;
-  final String route;
+  final String pseudocode;
+  final String? dataTitle;
+  final String? dataContent;
   final IconData icon;
-  final String badge;
-  final Color badgeColor;
-  final List<String> benefits;
-  final String largeText;
-  final bool isPayCollect;
-
-  const _ProductCard({
+  final String? function;
+  final String? endpoint;
+  final String payloadLabel;
+  final Color payloadColor;
+  const _VerticalStep({
     required this.title,
     required this.description,
-    required this.details,
-    required this.route,
+    required this.pseudocode,
+    this.dataTitle,
+    this.dataContent,
     required this.icon,
-    required this.badge,
-    required this.badgeColor,
-    required this.benefits,
-    required this.largeText,
-    required this.isPayCollect,
+    this.function,
+    this.endpoint,
+    required this.payloadLabel,
+    required this.payloadColor,
   });
-
-  @override
-  _ProductCardState createState() => _ProductCardState();
-}
-
-class _ProductCardState extends State<_ProductCard> with TickerProviderStateMixin {
-  bool _isHovered = false;
-  late AnimationController _dialogAnimationController;
-  late Animation<double> _dialogFadeAnimation;
-  late Animation<double> _dialogScaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _dialogAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    )..forward();
-    _dialogFadeAnimation = CurvedAnimation(
-      parent: _dialogAnimationController,
-      curve: Curves.easeInOut,
-    );
-    _dialogScaleAnimation = Tween<double>(begin: 0.95, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _dialogAnimationController,
-        curve: Curves.easeInOut,
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _dialogAnimationController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isLargeScreen = screenWidth > 800;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      transform: Matrix4.identity()..scale(_isHovered ? 1.03 : 1.0),
-      child: Card(
-        color: const Color(0xFFF9FAFB),
-        elevation: _isHovered ? 6 : 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Color(0xFFD1D5DB)),
-        ),
-        child: InkWell(
-          onTap: () {
-            try {
-              Navigator.pushNamed(context, widget.route);
-            } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${widget.route} route not found')),
-              );
-            }
-          },
-          borderRadius: BorderRadius.circular(12),
-          hoverColor: const Color(0xFFF3F4F6),
-          onHover: (hovered) {
-            setState(() {
-              _isHovered = hovered;
-            });
-          },
-          child: Stack(
-            children: [
-              // Large stylized text
-              Positioned(
-                left: widget.isPayCollect ? null : 16,
-                right: widget.isPayCollect ? 16 : null,
-                bottom: 80,
-                child: Opacity(
-                  opacity: 0.15,
-                  child: Text(
-                    widget.largeText,
-                    style: GoogleFonts.notoSans(
-                      fontSize: isLargeScreen ? 72 : 54,
-                      fontWeight: FontWeight.bold,
-                      color: widget.isPayCollect ? const Color(0xFF10B981) : const Color(0xFF3B82F6),
-                      shadows: [
-                        Shadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 4,
-                          offset: const Offset(2, 2),
-                        ),
-                      ],
-                    ),
-                    textAlign: widget.isPayCollect ? TextAlign.right : TextAlign.left,
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          transform: Matrix4.identity()..scale(_isHovered ? 1.1 : 1.0),
-                          child: Icon(
-                            widget.icon,
-                            size: isLargeScreen ? 32 : 28,
-                            color: widget.badgeColor,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: widget.badgeColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            widget.badge,
-                            style: GoogleFonts.notoSans(
-                              fontSize: isLargeScreen ? 12 : 11,
-                              fontWeight: FontWeight.w600,
-                              color: widget.badgeColor,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.title,
-                      style: GoogleFonts.notoSans(
-                        fontSize: isLargeScreen ? 18 : 16,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF111827),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.description,
-                      style: GoogleFonts.notoSans(
-                        fontSize: isLargeScreen ? 14 : 13,
-                        color: const Color(0xFF4B5563),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: widget.benefits.map((benefit) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2.0),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.check_circle,
-                              size: isLargeScreen ? 16 : 14,
-                              color: widget.badgeColor,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                benefit,
-                                style: GoogleFonts.notoSans(
-                                  fontSize: isLargeScreen ? 13 : 12,
-                                  color: const Color(0xFF4B5563),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )).toList(),
-                    ),
-                    const Spacer(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Tooltip(
-                          message: 'Learn more about ${widget.title}',
-                          child: ElevatedButton(
-                            onPressed: () => _showDetailsDialog(context),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: const Color(0xFF3B82F6),
-                              side: const BorderSide(color: Color(0xFF3B82F6)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              elevation: _isHovered ? 2 : 0,
-                            ),
-                            child: Text(
-                              'View Details',
-                              style: GoogleFonts.notoSans(
-                                fontSize: isLargeScreen ? 14 : 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Tooltip(
-                          message: 'Try ${widget.title} now',
-                          child: ElevatedButton(
-                            onPressed: () {
-                              try {
-                                Navigator.pushNamed(context, widget.route);
-                              } catch (e) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('${widget.route} route not found')),
-                                );
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF3B82F6),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              elevation: _isHovered ? 2 : 0,
-                            ),
-                            child: Text(
-                              'Try Now',
-                              style: GoogleFonts.notoSans(
-                                fontSize: isLargeScreen ? 14 : 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showDetailsDialog(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isLargeScreen = screenWidth > 800;
-    final titleFontSize = isLargeScreen ? 18.0 : 16.0;
-    final bodyFontSize = isLargeScreen ? 14.0 : 13.0;
-    final codeFontSize = isLargeScreen ? 12.0 : 11.0;
-    final iconSize = isLargeScreen ? 28.0 : 24.0;
-    final padding = isLargeScreen ? 16.0 : 12.0;
-
-    String? payload;
-    try {
-      final startMarker = '```json\n';
-      final endMarker = '\n```';
-      final startIndex = widget.details.indexOf(startMarker) + startMarker.length;
-      final endIndex = widget.details.indexOf(endMarker, startIndex);
-      payload = widget.details.substring(startIndex, endIndex).trim();
-    } catch (e) {
-      payload = null;
-    }
-
-    // Parse markdown content
-    List<Widget> contentWidgets = [];
-    final lines = widget.details.split('\n');
-    bool inCodeBlock = false;
-
-    for (var line in lines) {
-      line = line.trim();
-      if (line.isEmpty) {
-        contentWidgets.add(const SizedBox(height: 8));
-        continue;
-      }
-
-      if (line.startsWith('```json')) {
-        inCodeBlock = true;
-        continue;
-      } else if (line.startsWith('```')) {
-        inCodeBlock = false;
-        continue;
-      } else if (inCodeBlock) {
-        continue; // Skip code block content (handled by payload)
-      }
-
-      if (line.startsWith('**') && line.endsWith('**')) {
-        contentWidgets.add(
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: Text(
-              line.substring(2, line.length - 2),
-              style: GoogleFonts.poppins(
-                fontSize: titleFontSize,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF111827),
-              ),
-            ),
-          ),
-        );
-      } else if (line.startsWith('- ')) {
-        contentWidgets.add(
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4.0, left: 8.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.check_circle,
-                  size: isLargeScreen ? 16 : 14,
-                  color: widget.badgeColor,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    line.substring(2),
-                    style: GoogleFonts.poppins(
-                      fontSize: bodyFontSize,
-                      color: const Color(0xFF4B5563),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      } else if (line.startsWith('*') && line.endsWith('*')) {
-        contentWidgets.add(
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: Text(
-              line.substring(1, line.length - 1),
-              style: GoogleFonts.poppins(
-                fontSize: bodyFontSize,
-                fontStyle: FontStyle.italic,
-                color: const Color(0xFF4B5563),
-              ),
-            ),
-          ),
-        );
-      } else {
-        contentWidgets.add(
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: Text(
-              line,
-              style: GoogleFonts.poppins(
-                fontSize: bodyFontSize,
-                color: const Color(0xFF4B5563),
-              ),
-            ),
-          ),
-        );
-      }
-    }
-
-    // Add code block if payload exists
-    if (payload != null) {
-      contentWidgets.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Container(
-            padding: const EdgeInsets.all(12.0),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9), // Mimics bg-gray-100
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Text(
-                payload,
-                style: GoogleFonts.robotoMono(
-                  fontSize: codeFontSize,
-                  color: const Color(0xFF1F2937), // Mimics text-gray-800
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return FadeTransition(
-          opacity: _dialogFadeAnimation,
-          child: ScaleTransition(
-            scale: _dialogScaleAnimation,
-            child: AlertDialog(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              contentPadding: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              content: Container(
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFF9FAFB), Color(0xFFE5E7EB)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: EdgeInsets.all(padding),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Title with icon
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: widget.badgeColor.withOpacity(0.2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                widget.icon,
-                                size: iconSize,
-                                color: widget.badgeColor,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                widget.title,
-                                style: GoogleFonts.poppins(
-                                  fontSize: isLargeScreen ? 20 : 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF111827),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        // Parsed content
-                        ...contentWidgets,
-                        if (payload != null) ...[
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              AnimatedScale(
-                                scale: _isHovered ? 1.05 : 1.0,
-                                duration: const Duration(milliseconds: 200),
-                                child: ElevatedButton.icon(
-                                  onPressed: () {
-                                    Clipboard.setData(ClipboardData(text: payload ?? '')).then((_) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Payload copied to clipboard')),
-                                      );
-                                    }).catchError((e) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Failed to copy payload')),
-                                      );
-                                    });
-                                  },
-                                  icon: Icon(
-                                    Icons.copy,
-                                    size: isLargeScreen ? 16 : 14,
-                                    color: Colors.white,
-                                  ),
-                                  label: Text(
-                                    'Copy Payload',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: isLargeScreen ? 14 : 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: widget.badgeColor,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                    elevation: 2,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    'Close',
-                    style: GoogleFonts.poppins(
-                      fontSize: isLargeScreen ? 14 : 12,
-                      color: const Color(0xFF4B5563),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                AnimatedScale(
-                  scale: _isHovered ? 1.05 : 1.0,
-                  duration: const Duration(milliseconds: 200),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      try {
-                        Navigator.pushNamed(context, widget.route);
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('${widget.route} route not found')),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF3B82F6),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      elevation: 2,
-                    ),
-                    child: Text(
-                      'Try Now',
-                      style: GoogleFonts.poppins(
-                        fontSize: isLargeScreen ? 14 : 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
 
 class FlowVisualizerPage extends StatefulWidget {
   const FlowVisualizerPage({super.key});
 
   @override
-  State<FlowVisualizerPage> createState() => _FlowVisualizerPageState();
+  State<FlowVisualizerPage> createState() => _VerticalFlowVisualizerPageState();
 }
 
-class _FlowVisualizerPageState extends State<FlowVisualizerPage> with TickerProviderStateMixin {
-  static const _animationDuration = Duration(seconds: 2);
-  static const _stepAnimationBaseDuration = 500;
-  static const _stepAnimationDelay = 200;
+class _VerticalFlowVisualizerPageState extends State<FlowVisualizerPage> with TickerProviderStateMixin {
   static const _primaryColor = Color(0xFF1E3A8A);
   static const _accentColor = Color(0xFF3B82F6);
   static const _backgroundColor = Color(0xFFF8FAFC);
   static const _textColor = Color(0xFF4B5563);
 
-  late AnimationController _headerController;
-  late Animation<double> _headerOpacity;
-  final List<bool> _expandedStates = List.generate(7, (_) => false);
-  final List<AnimationController> _stepControllers = [];
-  final List<Animation<double>> _stepScales = [];
-
-  final List<Map<String, String>> _steps = [
-    {
-      'title': 'User Initiates Payment',
-      'description': 'Customer clicks the "Pay Now" button on the checkout screen.',
-      'details': '''
-- **Action**: User triggers the payment process by clicking "Pay Now".
-- **Result**: The app invokes the PayGlocal SDK to start the payment flow.
-- **Note**: This is a front-end event; no backend processing occurs yet.
-''',
-      'code': '''
-// User clicks the "Pay Now" button
-payment = initiateJwtPayment(payload);
-'''
-    },
-    {
-      'title': 'Payload Sent to SDK',
-      'description': 'The app sends payment details to the PayGlocal SDK.',
-      'details': '''
-- **Function Called**: `initiateJwtPayment(payload)`
-- **Payload Includes**:
-  - `merchantTxnId`: Unique transaction identifier
-  - `paymentData`: Amount and currency details
-  - `merchantCallbackURL`: URL for post-payment redirection
-- **Purpose**: Prepares data for secure processing and API interaction.
-''',
-      'code': '''
-async initiateJwtPayment(params) {
-  return initiateJwtPayment(params, this.config);
-}
-'''
-    },
-    {
-      'title': 'SDK Validates Payload',
-      'description': 'The SDK checks for required fields and schema validity.',
-      'details': '''
-- **Validation Checks**:
-  - Ensures `merchantTxnId` is not empty
-  - Verifies `paymentData` includes amount and currency
-  - Confirms `merchantCallbackURL` is valid
-- **Error Handling**: Throws descriptive errors for invalid payloads
-- **Purpose**: Ensures data integrity before proceeding
-''',
-      'code': '''
-async function initiateJwtPayment(payload, config) {
-  const { merchantTxnId, paymentData, merchantCallbackURL } = payload;
-  try {
-    validatePaycollectPayload(payload);
-  } catch (err) {
-    // throw new Error(`Schema validation failed: 
-  }
-  validateRequiredFields(
-    {
-      merchantTxnId,
-      paymentData,
-      merchantCallbackURL,
-      'paymentData.totalAmount': paymentData?.totalAmount,
-      'paymentData.txnCurrency': paymentData?.txnCurrency,
-    },
-    [
-      'merchantTxnId',
-      'paymentData',
-      'merchantCallbackURL',
-      'paymentData.totalAmount',
-      'paymentData.txnCurrency',
-    ]
-  );
-}
-'''
-    },
-    {
-      'title': 'JWE Token Creation',
-      'description': 'The SDK encrypts the payload into a secure JWE token.',
-      'details': '''
-- **Encryption**:
-  - Key: RSA-OAEP-256
-  - Content: A128CBC-HS256
-- **Token Contents**:
-  - Issued time, expiration, key ID, merchant ID
-- **Output**: Compact JWE string
-- **Purpose**: Secures sensitive data for API transmission
-- **Example JWE**: `eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2IiwiaWF0IjoiMTc1MzExMjg4MjUxMiIsImV4cCI6MzAwMDAwLCJraWQiOiJrSWQteUx0Umt5NDhYMkhxVzMwayIsImlzc3VlZC1ieSI6InRlc3RuZXdnY2MyNiJ9...`
-''',
-      'code': '''
-const jwe = await generateJWE(payload, config);
-
-async function generateJWE(payload, config) {
-  const iat = Date.now();
-  const publicKey = await pemToKey(config.payglocalPublicKey, false);
-  const payloadStr = JSON.stringify(payload);
-
-  return await new jose.CompactEncrypt(new TextEncoder().encode(payloadStr))
-    .setProtectedHeader({
-      alg: 'RSA-OAEP-256',
-      enc: 'A128CBC-HS256',
-      iat: iat.toString(),
-      exp: 300000,
-      kid: config.publicKeyId,
-      'issued-by': config.merchantId,
-    })
-    .encrypt(publicKey);
-}
-'''
-    },
-    {
-      'title': 'JWS Token Creation',
-      'description': 'The SDK signs the JWE token to ensure authenticity.',
-      'details': '''
-- **Algorithm**: RS256 (RSA-SHA256)
-- **Signed Content**: SHA-256 digest of the JWE token
-- **Header Includes**:
-  - Merchant ID, key ID, encryption flag
-- **Output**: Signed JWS token
-- **Purpose**: Verifies the request originates from the merchant
-- **Example JWS**: `eyJpc3N1ZWQtYnkiOiJ0ZXN0bmV3Z2NjMjYiLCJhbGciOiJSUzI1NiIsImtpZCI6ImtJZC12VTZlOGw2Yld0WEs4b09LIiwieC1nbC1tZXJjaGFudElkIjoidGVzdG5ld2djYzI2IiwieC1nbC1lbmMiOiJ0cnVlIiwiaXMtZGlnZXN0ZWQiOiJ0cnVlIn0...`
-''',
-      'code': '''
-const jws = await generateJWS(jwe, config);
-
-async function generateJWS(toDigest, config) {
-  const iat = Date.now();
-  const digest = crypto.createHash('sha256').update(toDigest).digest('base64');
-  const digestObject = {
-    digest,
-    digestAlgorithm: 'SHA-256',
-    exp: iat + 300000,
-    iat: iat.toString(),
-  };
-  const privateKey = await pemToKey(config.merchantPrivateKey, true);
-
-  return await new jose.SignJWT(digestObject)
-    .setProtectedHeader({
-      'issued-by': config.merchantId,
-      alg: 'RS256',
-      kid: config.privateKeyId,
-      'x-gl-merchantId': config.merchantId,
-      'x-gl-enc': 'true',
-      'is-digested': 'true',
-    })
-    .sign(privateKey);
-}
-'''
-    },
-    {
-      'title': 'API Request to PayGlocal',
-      'description': 'The SDK sends a secure POST request to the PayGlocal API.',
-      'details': '''
-- **Endpoint**: `https://api.uat.payglocal.in/gl/v1/payments/initiate/paycollect`
-- **Headers**:
-  - `x-gl-token-external`: JWS token
-  - `Content-Type`: text/plain
-- **Body**: JWE token
-- **Purpose**: Initiates the payment process on the server
-''',
-      'code': '''
-try {
-  // logger.info(`Initiating JWT payment:
-  const response = await post(
-    `payglocal.in/gl/v1/payments/initiate/paycollect`,
-    jwe,
-    {
-      'Content-Type': 'text/plain',
-      'x-gl-token-external': jws,
-    }
-  );
-}
-'''
-    },
-    {
-      'title': 'API Response',
-      'description': 'PayGlocal returns transaction details and a redirect URL.',
-      'details': '''
-- **Response Fields**:
-  - `gid`: Global transaction ID
-  - `status`: Typically "INPROGRESS"
-  - `redirectUrl`: URL for user redirection
-  - `statusUrl`: URL for transaction status checks
-  - `merchantTxnId`: Original transaction ID
-- **Purpose**: Provides instructions for the next user action
-''',
-      'code': '''
-{
-  gid: 'gl_o-962bd721e763755cdfss0I1X2',
-  status: 'INPROGRESS',
-  message: 'Transaction Created Successfully',
-  timestamp: '21/07/2025 21:18:03',
-  reasonCode: 'GL-201-001',
-  data: {
-    redirectUrl: 'https://api.uat.payglocal.in/gl/payflow-ui/...',
-    statusUrl: 'https://api.uat.payglocal.in/gl/v1/payments/...',
-    merchantTxnId: '1753112882385976608'
-  },
-  errors: null
-}
-'''
-    },
+  final List<_VerticalStep> _steps = [
+    _VerticalStep(
+      title: 'User Clicks Pay Button',
+      description: 'The user initiates the payment by clicking the payment button.',
+      pseudocode: 'onPayButtonClick() {\n    initiatePayment(payload)\n}',
+      dataTitle: 'Payload',
+      dataContent: '{\n  merchantTxnId: "23AEE8CB6B62EE2AF07",\n  paymentData: {\n    totalAmount: "89",\n    txnCurrency: "INR"\n  },\n  merchantCallbackURL: "https://api.prod.payglocal.in/gl/v1/payments/merchantCallback"\n}',
+      icon: Icons.touch_app,
+      function: 'onPayButtonClick()',
+      payloadLabel: 'Payload',
+      payloadColor: Colors.blueAccent,
+    ),
+    _VerticalStep(
+      title: 'Payload Passed to SDK Function',
+      description: 'The app passes the payload to the PayGlocal SDK function.',
+      pseudocode: 'payment = initiateJwtPayment(payload)',
+      dataTitle: 'Payload',
+      dataContent: '{\n  merchantTxnId: "23AEE8CB6B62EE2AF07",\n  paymentData: { ... },\n  merchantCallbackURL: "..."\n}',
+      icon: Icons.code,
+      function: 'initiateJwtPayment(payload)',
+      payloadLabel: 'Payload',
+      payloadColor: Colors.blueAccent,
+    ),
+    _VerticalStep(
+      title: 'SDK Receives and Forwards Payload',
+      description: 'The SDK receives the payload and forwards it for processing.',
+      pseudocode: 'async initiateJwtPayment(params) {\n  return initiateJwtPayment(params, this.config);\n}',
+      dataTitle: 'Payload',
+      dataContent: '{\n  merchantTxnId: "23AEE8CB6B62EE2AF07", ... }',
+      icon: Icons.extension,
+      function: 'initiateJwtPayment(params, config)',
+      payloadLabel: 'Payload',
+      payloadColor: Colors.blueAccent,
+    ),
+    _VerticalStep(
+      title: 'SDK Validates Payload',
+      description: 'SDK checks required fields and validates the schema.',
+      pseudocode: 'validatePayload(payload, config) {\n  if (!payload.merchantTxnId || !payload.paymentData) throw Error;\n  // ...other checks\n}',
+      dataTitle: 'Validation',
+      dataContent: 'All required fields present and valid',
+      icon: Icons.verified_user,
+      function: 'validatePayload(payload, config)',
+      payloadLabel: 'Payload',
+      payloadColor: Colors.blueAccent,
+    ),
+    _VerticalStep(
+      title: 'JWE Token Creation',
+      description: 'SDK encrypts the payload using JWE (JSON Web Encryption).',
+      pseudocode: 'jweToken = encryptWithJWE(payload, publicKey)\n// Uses RSA-OAEP-256, A128CBC-HS256',
+      dataTitle: 'JWE Token',
+      dataContent: 'eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2IiwiaWF0IjoiMTc1MzExMjg4MjUxMiIsImV4cCI6MzAwMDAwLCJraWQiOiJrSWQteUx0Umt5NDhYMkhxVzMwayIsImlzc3VlZC1ieSI6InRlc3RuZXdnY2MyNiJ9.N8cZ7FyWD6eDdkdimbxrPwiSYLQ4PjZOr_VFzhiijp2TPHja2zO2bda_WkxEqFb_kw0JZBkSJsnybmEvufbIIQea9CueIuz14TrY91dbPKHYy37iLbHmDp6N5migOaaC_65OKXetxBKF9y8ekLXPM0VWCAcoef5NaRM0pdJ4Fr_14Y2oITFr2186n1fYI2acDB9EzwCjc8M9h3NR-T7PbSpqEoqWfy3nu9PLK3qPSUdQlPMp2pQ5b2T4R5G4AZjZQ8kq104oYeaeHKrslUz3i-32axYUpWa733Q_mqApUmuA77vGSRAgPdJpjobIALHw3EYstMeXK8ed_tSkefLFWg.8HEU9vehR4yW3Gefh345xA.icKkmhqkoZuDqv5RmqU2gIHHy80feqtSUOa4OZMzunH_HIsf3Fww_odXsabwKF3JyxYq8__IggFIuEewDkm2rp3YjpgWvC_49qn-lxrfmUNZPOwgLcDiINuATYvnxun2VK9V9nkfqZHV-NUGJ1gmXgJfq1KmlTKHDGdS8ItqO6AEZ8Ypk5KJJEcHuE0BeqOEIQcmmkk0Pl0LsZ3vXeEWZyv5vmhKjXFVnH7zdTR-zjcAngFizk-lFvfeizEcRjEi.jxwSuAGR_fjyQ4_vDRhyRw',
+      icon: Icons.lock,
+      function: 'encryptWithJWE(payload, publicKey)',
+      payloadLabel: 'JWE Token',
+      payloadColor: Colors.orangeAccent,
+    ),
+    _VerticalStep(
+      title: 'JWS Token Creation',
+      description: 'SDK signs the JWE token using JWS (JSON Web Signature).',
+      pseudocode: 'jwsToken = signWithJWS(jweToken, privateKey)\n// Uses RS256 (RSA-SHA256)',
+      dataTitle: 'JWS Token',
+      dataContent: 'eyJpc3N1ZWQtYnkiOiJ0ZXN0bmV3Z2NjMjYiLCJhbGciOiJSUzI1NiIsImtpZCI6ImtJZC12VTZlOGw2Yld0WEs4b09LIiwieC1nbC1tZXJjaGFudElkIjoidGVzdG5ld2djYzI2IiwieC1nbC1lbmMiOiJ0cnVlIiwiaXMtZGlnZXN0ZWQiOiJ0cnVlIn0.eyJkaWdlc3QiOiI5aXZtbzFFSDdBZ2ZBdUtzNWYvQ1BDMkdFbG01UjhxbkJsYjhnUWxGV3BNPSIsImRpZ2VzdEFsZ29yaXRobSI6IlNIQS0yNTYiLCJleHAiOjE3NTMxMTMxODI1MjksImlhdCI6IjE3NTMxMTI4ODI1MjkifQ.qF58y_ZfrL3GAppzAgS6H9c75DdNvfhgr9uS8GQUQ55fN8mkeY1FJ61GTBgIcCKeph8QPTKThPJWBCr53qYfadSx0pcHhcnAjudzBj_uldPdA1tVfxk3Zf-g4ZGqw9j9E5Jj1PPIQ3K3lLyvTZxgvY1J8IqlXUGyxOqOlwgFDbkNbOn4isGevi5CaR5w2cqBOfeIof_EMooBFpt_bZdKj1F9j34UZJ1ghgf1VVriZceT0cEgu0CdXuTFIwLTsjsldqm5zD6S6ZZ33ehbfK3UoRbCXusJ_YZT7cu4BGDYU9V6MrAuFERmpvbUfoCVLvOVMvhxAnrG6bv2Raox-V_p8w',
+      icon: Icons.verified,
+      function: 'signWithJWS(jweToken, privateKey)',
+      payloadLabel: 'JWS Token',
+      payloadColor: Colors.green,
+    ),
+    _VerticalStep(
+      title: 'API Call to PayGlocal',
+      description: 'SDK sends both JWE and JWS tokens to the PayGlocal API endpoint.',
+      pseudocode: 'POST /gl/v1/payments/initiate/paycollect\nHeaders: {\n  x-gl-token-external: jwsToken,\n  Content-Type: text/plain\n}\nBody: jweToken',
+      dataTitle: 'Headers & Body',
+      dataContent: '{\n  x-gl-token-external: jwsToken,\n  Content-Type: text/plain\n}\nBody: jweToken',
+      icon: Icons.cloud_upload,
+      endpoint: '/gl/v1/payments/initiate/paycollect',
+      payloadLabel: 'JWE + JWS',
+      payloadColor: Colors.purple,
+    ),
+    _VerticalStep(
+      title: 'PayGlocal Responds',
+      description: 'PayGlocal processes the request and returns transaction details and redirect URL.',
+      pseudocode: 'response = {\n  gid: "gl_o-962bd721e763755cdfss0I1X2",\n  status: "INPROGRESS",\n  message: "Transaction Created Successfully",\n  ...\n}',
+      dataTitle: 'Response',
+      dataContent: '{\n  gid: "gl_o-962bd721e763755cdfss0I1X2",\n  status: "INPROGRESS",\n  message: "Transaction Created Successfully",\n  data: {\n    redirectUrl: "https://api.uat.payglocal.in/gl/payflow-ui/...",\n    statusUrl: "https://api.uat.payglocal.in/gl/v1/payments/...",\n    merchantTxnId: "1753112882385976608"\n  },\n  errors: null\n}',
+      icon: Icons.cloud_download,
+      payloadLabel: 'Response',
+      payloadColor: Colors.teal,
+    ),
   ];
+
+  int _currentStep = 0;
+  late AnimationController _mainController;
+  late Animation<double> _mainAnimation;
+  final List<String> _buttonLabels = [
+    'Click Pay Now and Send Payload',
+    'Send Payload to SDK',
+    'Send Payload for Validation',
+    'Send Payload for JWE Creation',
+    'Send JWE for JWS Creation',
+    'Send JWE and JWS to Final API Call',
+    'Send Request to PayGlocal API',
+    '', // No button for response step
+  ];
+
+  final _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    _initializeAnimations();
-  }
-
-  void _initializeAnimations() {
-    _headerController = AnimationController(
+    _mainController = AnimationController(
       vsync: this,
-      duration: _animationDuration,
+      duration: const Duration(milliseconds: 700),
     );
-    _headerOpacity = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _headerController, curve: Curves.easeInOut),
-    );
-
-    for (var i = 0; i < _steps.length; i++) {
-      final controller = AnimationController(
-        vsync: this,
-        duration: Duration(milliseconds: _stepAnimationBaseDuration + i * _stepAnimationDelay),
-      );
-      _stepControllers.add(controller);
-      _stepScales.add(
-        Tween<double>(begin: 0.8, end: 1.0).animate(
-          CurvedAnimation(parent: controller, curve: Curves.easeOutCubic),
-        ),
-      );
-      controller.forward();
-    }
-    _headerController.forward();
+    _mainAnimation = CurvedAnimation(parent: _mainController, curve: Curves.easeInOut);
+    _mainController.value = 1.0;
   }
 
   @override
   void dispose() {
-    _headerController.dispose();
-    for (var controller in _stepControllers) {
-      controller.dispose();
-    }
+    _mainController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _replayAnimations() {
-    _headerController.reset();
-    for (var controller in _stepControllers) {
-      controller.reset();
-      controller.forward();
+  void _nextStep() async {
+    if (_currentStep < _steps.length - 1) {
+      _mainController.value = 0.0;
+      setState(() {});
+      await _mainController.forward();
+      setState(() {
+        _currentStep++;
+      });
+      _mainController.value = 1.0;
+      // Auto-scroll to the new step
+      await Future.delayed(const Duration(milliseconds: 100));
+      _scrollToCurrentStep();
     }
-    _headerController.forward();
   }
+
+  void _prevStep() async {
+    if (_currentStep > 0) {
+      setState(() {
+        _currentStep--;
+      });
+      _mainController.value = 1.0;
+      // Auto-scroll to the new step
+      await Future.delayed(const Duration(milliseconds: 100));
+      _scrollToCurrentStep();
+    }
+  }
+
+  void _scrollToCurrentStep() {
+    final keyContext = _stepKeys[_currentStep].currentContext;
+    if (keyContext != null) {
+      Scrollable.ensureVisible(
+        keyContext,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+        alignment: 0.1,
+      );
+    }
+  }
+
+  final List<GlobalKey> _stepKeys = List.generate(8, (_) => GlobalKey());
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isLargeScreen = screenWidth > 600;
-
+    final isLargeScreen = screenWidth > 800;
     return Theme(
       data: ThemeData(
         primaryColor: _primaryColor,
@@ -1282,777 +586,677 @@ try {
         scaffoldBackgroundColor: _backgroundColor,
       ),
       child: Scaffold(
-        appBar: _buildAppBar(isLargeScreen),
+        appBar: SharedAppBar(
+          title: 'PayGlocal Payment Flow',
+        ),
         body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(isLargeScreen),
-                const SizedBox(height: 24),
-                CustomPaint(
-                  painter: ArrowPainter(_steps.length, screenWidth),
-                  child: Column(
-                    children: _steps.asMap().entries.map((entry) {
-                      return _buildStepCard(entry.key, entry.value, isLargeScreen);
-                    }).toList(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        floatingActionButton: _buildReplayButton(),
-      ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar(bool isLargeScreen) {
-    return AppBar(
-      title: Text(
-        'PayGlocal Payment Flow',
-        style: GoogleFonts.poppins(
-          fontSize: isLargeScreen ? 24 : 20,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
-        ),
-      ),
-      backgroundColor: _primaryColor,
-      elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.2),
-    );
-  }
-
-  Widget _buildHeader(bool isLargeScreen) {
-    return FadeTransition(
-      opacity: _headerOpacity,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Payment Flow Visualizer',
-              style: GoogleFonts.poppins(
-                fontSize: isLargeScreen ? 28 : 24,
-                fontWeight: FontWeight.bold,
-                color: _primaryColor,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'An interactive guide to the PayGlocal payment process, from user action to server response.',
-              style: GoogleFonts.poppins(
-                fontSize: isLargeScreen ? 16 : 14,
-                color: _textColor,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStepCard(int index, Map<String, String> step, bool isLargeScreen) {
-    return AnimatedBuilder(
-      animation: _stepControllers[index],
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _stepScales[index].value,
-          child: Column(
-            children: [
-              Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                child: ExpansionTile(
-                  tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  childrenPadding: const EdgeInsets.all(16),
-                  leading: CircleAvatar(
-                    backgroundColor: _accentColor.withOpacity(0.1),
-                    child: Text(
-                      '${index + 1}',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: _accentColor,
-                      ),
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16.0),
+                    child: Image.asset(
+                      'assets/images/code_flow.png',
+                      fit: BoxFit.contain,
+                      width: 600,
+                      errorBuilder: (context, error, stackTrace) => const Text('Code flow image not found.'),
                     ),
                   ),
-                  title: Text(
-                    step['title']!,
+                  Text(
+                    'How PayGlocal Payment Works',
                     style: GoogleFonts.poppins(
-                      fontSize: isLargeScreen ? 18 : 16,
-                      fontWeight: FontWeight.w600,
+                      fontSize: isLargeScreen ? 32 : 22,
+                      fontWeight: FontWeight.bold,
                       color: _primaryColor,
                     ),
                   ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      step['description']!,
-                      style: GoogleFonts.poppins(
-                        fontSize: isLargeScreen ? 14 : 12,
-                        color: _textColor,
-                      ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'A dynamic, step-by-step visual journey from user action to secure payment.',
+                    style: GoogleFonts.poppins(
+                      fontSize: isLargeScreen ? 16 : 13,
+                      color: _textColor,
                     ),
+                    textAlign: TextAlign.center,
                   ),
-                  children: [
-                    SelectableText(
-                      step['details']!,
-                      style: GoogleFonts.robotoMono(
-                        fontSize: isLargeScreen ? 14 : 12,
-                        color: _textColor,
-                      ),
-                    ),
-                    if (step['code'] != null) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: _backgroundColor,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: SelectableText(
-                          step['code']!,
-                          style: GoogleFonts.robotoMono(
-                            fontSize: isLargeScreen ? 13 : 11,
-                            color: _textColor,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                  onExpansionChanged: (expanded) {
-                    setState(() {
-                      _expandedStates[index] = expanded;
-                    });
-                  },
-                ),
+                  const SizedBox(height: 32),
+                  _buildStepByStepFlow(isLargeScreen),
+                  const SizedBox(height: 32),
+                ],
               ),
-              if (index < _steps.length - 1) const SizedBox(height: 40),
-            ],
+            ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
-  Widget _buildReplayButton() {
-    return FloatingActionButton.extended(
-      onPressed: _replayAnimations,
-      label: const Text('Replay Animations'),
-      icon: const Icon(Icons.replay),
-      backgroundColor: _accentColor,
-      tooltip: 'Replay all animations',
+  Widget _buildStepByStepFlow(bool isLargeScreen) {
+    return Column(
+      children: [
+        ...List.generate(_currentStep + 1, (i) => Column(
+          key: _stepKeys[i],
+          children: [
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 500),
+              child: AnimatedStepCard(
+                key: ValueKey('step-$i'),
+                step: _steps[i],
+                isActive: i == _currentStep,
+                isLargeScreen: isLargeScreen,
+                showNext: i == _currentStep && i < _steps.length - 1 && _buttonLabels[i].isNotEmpty,
+                showBack: i == _currentStep && i > 0,
+                onNext: _nextStep,
+                onBack: _prevStep,
+                buttonLabel: _buttonLabels[i],
+                showPayloadAnim: i == _currentStep,
+                payloadLabel: _steps[i].payloadLabel,
+                payloadColor: _steps[i].payloadColor,
+              ),
+            ),
+            if (i < _currentStep) const SizedBox(height: 32),
+          ],
+        )),
+      ],
     );
   }
 }
 
-class ArrowPainter extends CustomPainter {
-  final int stepCount;
-  final double screenWidth;
 
-  ArrowPainter(this.stepCount, this.screenWidth);
 
+
+
+class _VerticalFlowArrowPainter extends CustomPainter {
+  final int step;
+  final double t;
+  final int totalSteps;
+  final double cardHeight;
+  final double verticalSpacing;
+  _VerticalFlowArrowPainter(this.step, this.t, this.totalSteps, this.cardHeight, this.verticalSpacing);
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = _FlowVisualizerPageState._textColor.withOpacity(0.5)
+      ..color = Colors.grey.withOpacity(0.18)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-
-    const stepHeight = 80.0;
-    const spacing = 40.0;
-    const arrowHeadSize = 8.0;
-
-    for (var i = 0; i < stepCount - 1; i++) {
-      final startY = (i + 1) * (stepHeight + spacing) - spacing / 2;
-      final endY = (i + 1) * (stepHeight + spacing) + spacing / 2;
-
-      canvas.drawLine(
-        Offset(screenWidth / 2, startY),
-        Offset(screenWidth / 2, endY),
-        paint,
-      );
-
-      final path = Path()
-        ..moveTo(screenWidth / 2 - arrowHeadSize, endY - arrowHeadSize)
-        ..lineTo(screenWidth / 2, endY)
-        ..lineTo(screenWidth / 2 + arrowHeadSize, endY - arrowHeadSize)
-        ..close();
-      canvas.drawPath(path, paint..style = PaintingStyle.fill);
+      ..strokeWidth = 4;
+    for (int i = 0; i < totalSteps - 1; i++) {
+      final y1 = 40.0 + i * (cardHeight + verticalSpacing) + cardHeight / 2;
+      final y2 = 40.0 + (i + 1) * (cardHeight + verticalSpacing) + cardHeight / 2;
+      if (step == i + 1) {
+        final p1 = Offset(size.width / 2, y1);
+        final p2 = Offset(size.width / 2, y1 + (y2 - y1) * t);
+        canvas.drawLine(p1, p2, paint);
+        if (t > 0.95) {
+          final arrowSize = 12.0;
+          final arrowP = Offset(size.width / 2, y2);
+          final path = Path();
+          path.moveTo(arrowP.dx, arrowP.dy);
+          path.lineTo(arrowP.dx - arrowSize, arrowP.dy - arrowSize);
+          path.moveTo(arrowP.dx, arrowP.dy);
+          path.lineTo(arrowP.dx + arrowSize, arrowP.dy - arrowSize);
+          canvas.drawPath(path, paint);
+        }
+      } else if (step > i + 1) {
+        canvas.drawLine(
+          Offset(size.width / 2, y1),
+          Offset(size.width / 2, y2),
+          paint,
+        );
+      }
     }
   }
-
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
 
 
+class _PayloadStructureModal extends StatefulWidget {
+  @override
+  State<_PayloadStructureModal> createState() => _PayloadStructureModalState();
+}
 
+class _PayloadStructureModalState extends State<_PayloadStructureModal> {
+  final List<_MerchantPayload> _payloads = [
+  _MerchantPayload(
+    name: 'E-commerce / Retail Merchant',
+    icon: Icons.shopping_cart,
+    pretty: _prettyJson(jsonDecode(r'''{
+      "merchantTxnId": "1753423017399291277",
+      "merchantId": "MERCH456",
+      "merchantCallbackURL": "https://api.uat.payglocal.in/gl/v1/payments/merchantCallback",
+      "paymentData": {
+        "totalAmount": "2499.00",
+        "txnCurrency": "INR",
+        "cardData": {
+          "number": "4242424242424242",
+          "expiryMonth": "12",
+          "expiryYear": "2030",
+          "securityCode": "123",
+          "type": "visa"
+        }
+      },
+      "riskData": {
+        "orderData": [
+          {
+            "productDescription": "Laptop",
+            "productSKU": "LAP123",
+            "productType": "Electronics",
+            "itemUnitPrice": "2499.00",
+            "itemQuantity": "1"
+          }
+        ],
+        "shippingData": {
+          "firstName": "Mock",
+          "lastName": "Trader",
+          "addressStreet1": "Rowley street 1",
+          "addressStreet2": "Punctuality lane",
+          "addressCity": "Bangalore",
+          "addressState": "Karnataka",
+          "addressStateCode": "KA",
+          "addressPostalCode": "560094",
+          "addressCountry": "IN",
+          "emailId": "mocktrader@myemail.com",
+          "phoneNumber": "+919191919191"
+        }
+      }
+    }''')),
+  ),
+  _MerchantPayload(
+    name: 'Hotel / Lodging Merchant',
+    icon: Icons.hotel,
+    pretty: _prettyJson(jsonDecode(r'''{
+      "merchantTxnId": "TXN-LODGING-789",
+      "merchantId": "MERCH789",
+      "merchantUniqueId": "HOTEL456",
+      "merchantCallbackURL": "https://merchant.com/hotel-callback",
+      "paymentData": {
+        "totalAmount": "8000.00",
+        "txnCurrency": "INR",
+        "cardData": {
+          "number": "4111111111111111",
+          "expiryMonth": "12",
+          "expiryYear": "2026",
+          "securityCode": "789",
+          "type": "visa"
+        }
+      },
+      "riskData": {
+        "lodgingData": [
+          {
+            "checkInDate": "20250801",
+            "checkOutDate": "20250803",
+            "lodgingType": "Hotel",
+            "lodgingName": "Sunset Resort",
+            "city": "Goa",
+            "country": "IN",
+            "bookingPersonFirstName": "John",
+            "bookingPersonLastName": "Doe",
+            "bookingPersonEmailId": "john.doe@example.com",
+            "bookingPersonCallingCode": "+91",
+            "bookingPersonPhoneNumber": "9876543210",
+            "rooms": [
+              {
+                "numberOfGuests": "2",
+                "roomType": "Deluxe",
+                "roomPrice": "4000",
+                "numberOfNights": "2",
+                "guestFirstName": "John",
+                "guestLastName": "Doe",
+                "guestEmail": "john.doe@example.com"
+              }
+            ]
+          }
+        ]
+      }
+    }''')),
+  ),
+  _MerchantPayload(
+    name: 'Airline / Airways Merchant',
+    icon: Icons.airplanemode_active,
+    pretty: _prettyJson(jsonDecode(r'''{
+      "merchantTxnId": "1753422960093968920",
+      "merchantId": "MERCH101",
+      "merchantCallbackURL": "https://api.uat.payglocal.in/gl/v1/payments/merchantCallback",
+      "paymentData": {
+        "totalAmount": "1499.00",
+        "txnCurrency": "INR",
+        "cardData": {
+          "number": "4242424242424242",
+          "expiryMonth": "12",
+          "expiryYear": "2030",
+          "securityCode": "123",
+          "type": "visa"
+        }
+      },
+      "riskData": {
+        "flightData": [
+          {
+            "ticketNumber": "FL123456",
+            "reservationDate": "20250810",
+            "journeyType": "ONEWAY",
+            "legData": [
+              {
+                "routeId": "1",
+                "legId": "1",
+                "flightNumber": "AI101",
+                "departureDate": "20250815T10:00:00Z",
+                "departureAirportCode": "BLR",
+                "departureCity": "Bangalore",
+                "departureCountry": "IN",
+                "arrivalDate": "20250815T12:00:00Z",
+                "arrivalAirportCode": "DEL",
+                "arrivalCity": "Delhi",
+                "arrivalCountry": "IN",
+                "carrierCode": "AI",
+                "carrierName": "Air India",
+                "serviceClass": "Economy"
+              }
+            ],
+            "passengerData": [
+              {
+                "firstName": "Mock",
+                "lastName": "Trader",
+                "dateOfBirth": "19900101",
+                "email": "mocktrader@myemail.com",
+                "passportCountry": "IN",
+                "referenceNumber": "PASS123"
+              }
+            ]
+          }
+        ]
+      }
+    }''')),
+  ),
+  _MerchantPayload(
+    name: 'Train Booking Merchant',
+    icon: Icons.train,
+    pretty: _prettyJson(jsonDecode(r'''{
+      "merchantTxnId": "TXN-TRAIN-321",
+      "merchantId": "MERCH202",
+      "merchantUniqueId": "TRAIN789",
+      "merchantCallbackURL": "https://merchant.com/train-callback",
+      "paymentData": {
+        "totalAmount": "1500.00",
+        "txnCurrency": "INR",
+        "cardData": {
+          "number": "4111111111111111",
+          "expiryMonth": "09",
+          "expiryYear": "2025",
+          "securityCode": "456",
+          "type": "visa"
+        }
+      },
+      "riskData": {
+        "trainData": [
+          {
+            "ticketNumber": "IRCTC12345",
+            "reservationDate": "20250810",
+            "legData": [
+              {
+                "routeId": "1",
+                "legId": "1",
+                "trainNumber": "12951",
+                "departureCity": "Mumbai",
+                "departureCountry": "IN",
+                "arrivalCity": "Delhi",
+                "arrivalCountry": "IN",
+                "departureDate": "20250815T20:00:00Z",
+                "arrivalDate": "20250816T06:00:00Z"
+              }
+            ],
+            "passengerData": [
+              {
+                "firstName": "Amit",
+                "lastName": "Sharma",
+                "dateOfBirth": "19900101",
+                "email": "amit.sharma@example.com",
+                "passportCountry": "IN",
+                "referenceNumber": "PASS456"
+              }
+            ]
+          }
+        ]
+      }
+    }''')),
+  ),
+  _MerchantPayload(
+    name: 'Bus Booking Merchant',
+    icon: Icons.directions_bus,
+    pretty: _prettyJson(jsonDecode(r'''{
+      "merchantTxnId": "TXN-BUS-111",
+      "merchantId": "MERCH303",
+      "merchantUniqueId": "BUS123",
+      "merchantCallbackURL": "https://merchant.com/bus-callback",
+      "paymentData": {
+        "totalAmount": "600.00",
+        "txnCurrency": "INR",
+        "cardData": {
+          "number": "4111111111111111",
+          "expiryMonth": "11",
+          "expiryYear": "2026",
+          "securityCode": "654",
+          "type": "visa"
+        }
+      },
+      "riskData": {
+        "busData": [
+          {
+            "ticketNumber": "BUS78901",
+            "reservationDate": "20250818",
+            "legData": [
+              {
+                "routeId": "1",
+                "legId": "1",
+                "busNumber": "KA01AB1234",
+                "departureCity": "Bangalore",
+                "departureCountry": "IN",
+                "arrivalCity": "Chennai",
+                "arrivalCountry": "IN",
+                "departureDate": "20250820T08:00:00Z",
+                "arrivalDate": "20250820T14:00:00Z"
+              }
+            ],
+            "passengerData": [
+              {
+                "firstName": "Priya",
+                "lastName": "Iyer",
+                "dateOfBirth": "19950610",
+                "email": "priya.iyer@example.com",
+                "passportCountry": "IN",
+                "referenceNumber": "PASS789"
+              }
+            ]
+          }
+        ]
+      }
+    }''')),
+  ),
+  _MerchantPayload(
+    name: 'Ship / Cruise Merchant',
+    icon: Icons.directions_boat,
+    pretty: _prettyJson(jsonDecode(r'''{
+      "merchantTxnId": "TXN-SHIP-222",
+      "merchantId": "MERCH606",
+      "merchantUniqueId": "SHIP123",
+      "merchantCallbackURL": "https://merchant.com/ship-callback",
+      "paymentData": {
+        "totalAmount": "5000.00",
+        "txnCurrency": "USD",
+        "cardData": {
+          "number": "4111111111111111",
+          "expiryMonth": "06",
+          "expiryYear": "2028",
+          "securityCode": "321",
+          "type": "visa"
+        }
+      },
+      "riskData": {
+        "shipData": [
+          {
+            "ticketNumber": "SHIP12345",
+            "reservationDate": "20250805",
+            "legData": [
+              {
+                "routeId": "1",
+                "legId": "1",
+                "shipNumber": "CRZ789",
+                "departureCity": "Miami",
+                "departureCountry": "US",
+                "arrivalCity": "Nassau",
+                "arrivalCountry": "BS",
+                "departureDate": "20250806T09:00:00Z",
+                "arrivalDate": "20250807T09:00:00Z"
+              }
+            ],
+            "passengerData": [
+              {
+                "firstName": "Suresh",
+                "lastName": "Nair",
+                "dateOfBirth": "19850815",
+                "email": "suresh.nair@example.com",
+                "passportCountry": "US",
+                "referenceNumber": "PASS234"
+              }
+            ]
+          }
+        ]
+      }
+    }''')),
+  ),
+  _MerchantPayload(
+    name: 'Cab Aggregator Merchant',
+    icon: Icons.local_taxi,
+    pretty: _prettyJson(jsonDecode(r'''{
+      "merchantTxnId": "TXN-CAB-456",
+      "merchantId": "MERCH404",
+      "merchantUniqueId": "CABMER456",
+      "merchantCallbackURL": "https://merchant.com/cab-callback",
+      "paymentData": {
+        "totalAmount": "350.00",
+        "txnCurrency": "INR",
+        "cardData": {
+          "number": "4111111111111111",
+          "expiryMonth": "10",
+          "expiryYear": "2027",
+          "securityCode": "112",
+          "type": "visa"
+        }
+      },
+      "riskData": {
+        "cabData": [
+          {
+            "reservationDate": "20250825",
+            "legData": [
+              {
+                "routeId": "1",
+                "legId": "1",
+                "pickupDate": "20250825T09:30:00Z",
+                "departureCity": "Bangalore",
+                "departureCountry": "IN",
+                "arrivalCity": "Mumbai",
+                "arrivalCountry": "IN"
+              }
+            ],
+            "passengerData": [
+              {
+                "firstName": "Ravi",
+                "lastName": "Verma",
+                "dateOfBirth": "19901111",
+                "email": "ravi.verma@example.com",
+                "passportCountry": "IN",
+                "referenceNumber": "PASS101"
+              }
+            ]
+          }
+        ]
+      }
+    }''')),
+  ),
+  _MerchantPayload(
+    name: 'Customer-Focused Merchant',
+    icon: Icons.person,
+    pretty: _prettyJson(jsonDecode(r'''{
+      "merchantTxnId": "1753423174528",
+      "merchantId": "MERCH505",
+      "merchantCallbackURL": "https://api.uat.payglocal.in/gl/v1/payments/merchantCallback",
+      "paymentData": {
+        "totalAmount": "649.00",
+        "txnCurrency": "INR",
+        "cardData": {
+          "number": "4242424242424242",
+          "expiryMonth": "12",
+          "expiryYear": "2030",
+          "securityCode": "123",
+          "type": "visa"
+        }
+      },
+      "riskData": {
+        "customerData": {
+          "customerAccountType": "SUBSCRIPTION",
+          "customerSuccessOrderCount": "5",
+          "customerAccountCreationDate": "20240101",
+          "merchantAssignedCustomerId": "CUST123"
+        }
+      }
+    }''')),
+  ),
+  _MerchantPayload(
+    name: 'General Merchant',
+    icon: Icons.store,
+    pretty: _prettyJson(jsonDecode(r'''{
+      "merchantTxnId": "23AEE8CB6B62EE2AF07",
+      "merchantId": "MERCH123",
+      "merchantUniqueId": "IFNN939494NJFJ",
+      "merchantCallbackURL": "https://www.merchanturl.com/callback",
+      "paymentData": {
+        "totalAmount": "1000.00",
+        "txnCurrency": "INR",
+        "tokenData": {
+          "number": "TOKEN123",
+          "expiryMonth": "12",
+          "expiryYear": "2030",
+          "cryptogram": "CRYPT456",
+          "firstSix": "424242",
+          "lastFour": "4242",
+          "cardBrand": "VISA",
+          "cardCountryCode": "IN",
+          "cardIssuerName": "HDFC Bank",
+          "cardType": "CREDIT",
+          "cardCategory": "PLATINUM"
+        }
+      }
+    }''')),
+  ),
+];
 
+  String _search = '';
+  int _selected = 0;
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _payloads
+        .where((p) => p.name.toLowerCase().contains(_search.toLowerCase()))
+        .toList();
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.95,
+      minChildSize: 0.5,
+      maxChildSize: 0.98,
+      builder: (context, scrollController) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            TextField(
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search),
+                hintText: 'Search merchant type...',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+              ),
+              onChanged: (v) => setState(() => _search = v),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<int>(
+              value: filtered.isNotEmpty
+                  ? filtered.indexWhere((p) => p.name == _payloads[_selected].name)
+                  : 0,
+              isExpanded: true,
+              icon: const Icon(Icons.arrow_drop_down),
+              decoration: InputDecoration(
+                labelText: 'Merchant Type',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+              ),
+              items: filtered.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final p = entry.value;
+                return DropdownMenuItem<int>(
+                  value: idx,
+                  child: Row(
+                    children: [
+                      Icon(p.icon, color: Colors.blueAccent),
+                      const SizedBox(width: 8),
+                      Text(p.name, style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (idx) {
+                if (idx != null) {
+                  final selectedPayload = filtered[idx];
+                  final realIdx = _payloads.indexWhere((p) => p.name == selectedPayload.name);
+                  setState(() => _selected = realIdx);
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            Text('Payload', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 8),
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.vertical,
+                  child: SelectableText(
+                    _payloads[_selected].pretty,
+                    style: GoogleFonts.robotoMono(fontSize: 15, color: Colors.teal.shade900),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: _payloads[_selected].pretty));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payload copied!')));
+                },
+                icon: const Icon(Icons.copy),
+                label: const Text('Copy'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
+class _MerchantPayload {
+  final String name;
+  final IconData icon;
+  final String pretty;
+  _MerchantPayload({required this.name, required this.icon, required this.pretty});
+}
 
-
-
-
-
-
-
-
-
-
-// class FlowVisualizerPage extends StatefulWidget {
-//   const FlowVisualizerPage({super.key});
-
-//   @override
-//   State<FlowVisualizerPage> createState() => _FlowVisualizerPageState();
-// }
-
-// class _FlowVisualizerPageState extends State<FlowVisualizerPage>
-//     with TickerProviderStateMixin {
-//   static const _animationDuration = Duration(seconds: 2);
-//   static const _stepAnimationBaseDuration = 500;
-//   static const _stepAnimationDelay = 200;
-//   static const _primaryColor = Color(0xFF1E3A8A);
-//   static const _accentColor = Color(0xFF3B82F6);
-//   static const _backgroundColor = Color(0xFFF8FAFC);
-//   static const _textColor = Color(0xFF4B5563);
-
-//   late AnimationController _headerController;
-//   late Animation<double> _headerOpacity;
-//   final List<bool> _expandedStates = List.generate(7, (_) => false);
-//   final List<AnimationController> _stepControllers = [];
-//   final List<Animation<double>> _stepScales = [];
-//   late List<Animation<Offset>> _stepOffsets;
-//   late List<Animation<double>> _stepOpacities;
-//   late AnimationController _arrowController;
-//   late Animation<double> _arrowAnimation;
-
-//   final List<Map<String, String>> _steps = [
-//  {
-//       'title': 'User Initiates Payment',
-//       'description': 'Customer clicks the "Pay Now" button on the checkout screen.',
-//       'details': '''
-// - **Action**: User triggers the payment process by clicking "Pay Now".
-// - **Result**: The app invokes the PayGlocal SDK to start the payment flow.
-// - **Note**: This is a front-end event; no backend processing occurs yet.
-// ''',
-//       'code': '''
-// // User clicks the "Pay Now" button
-// payment = initiateJwtPayment(payload);
-// '''
-//     },
-//     {
-//       'title': 'Payload Sent to SDK',
-//       'description': 'The app sends payment details to the PayGlocal SDK.',
-//       'details': '''
-// - **Function Called**: `initiateJwtPayment(payload)`
-// - **Payload Includes**:
-//   - `merchantTxnId`: Unique transaction identifier
-//   - `paymentData`: Amount and currency details
-//   - `merchantCallbackURL`: URL for post-payment redirection
-// - **Purpose**: Prepares data for secure processing and API interaction.
-// ''',
-//       'code': '''
-// async initiateJwtPayment(params) {
-//   return initiateJwtPayment(params, this.config);
-// }
-// '''
-//     },
-//     {
-//       'title': 'SDK Validates Payload',
-//       'description': 'The SDK checks for required fields and schema validity.',
-//       'details': '''
-// - **Validation Checks**:
-//   - Ensures `merchantTxnId` is not empty
-//   - Verifies `paymentData` includes amount and currency
-//   - Confirms `merchantCallbackURL` is valid
-// - **Error Handling**: Throws descriptive errors for invalid payloads
-// - **Purpose**: Ensures data integrity before proceeding
-// ''',
-//       'code': '''
-// async function initiateJwtPayment(payload, config) {
-//   const { merchantTxnId, paymentData, merchantCallbackURL } = payload;
-//   try {
-//     validatePaycollectPayload(payload);
-//   } catch (err) {
-//     throw new Error(`Schema validation failed: error`);
-//   }
-//   validateRequiredFields(
-//     {
-//       merchantTxnId,
-//       paymentData,
-//       merchantCallbackURL,
-//       'paymentData.totalAmount': paymentData?.totalAmount,
-//       'paymentData.txnCurrency': paymentData?.txnCurrency,
-//     },
-//     [
-//       'merchantTxnId',
-//       'paymentData',
-//       'merchantCallbackURL',
-//       'paymentData.totalAmount',
-//       'paymentData.txnCurrency',
-//     ]
-//   );
-// }
-// '''
-//     },
-//     {
-//       'title': 'JWE Token Creation',
-//       'description': 'The SDK encrypts the payload into a secure JWE token.',
-//       'details': '''
-// - **Encryption**:
-//   - Key: RSA-OAEP-256
-//   - Content: A128CBC-HS256
-// - **Token Contents**:
-//   - Issued time, expiration, key ID, merchant ID
-// - **Output**: Compact JWE string
-// - **Purpose**: Secures sensitive data for API transmission
-// - **Example JWE**: `eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2IiwiaWF0IjoiMTc1MzExMjg4MjUxMiIsImV4cCI6MzAwMDAwLCJraWQiOiJrSWQteUx0Umt5NDhYMkhxVzMwayIsImlzc3VlZC1ieSI6InRlc3RuZXdnY2MyNiJ9...`
-// ''',
-//       'code': '''
-// const jwe = await generateJWE(payload, config);
-
-// async function generateJWE(payload, config) {
-//   const iat = Date.now();
-//   const publicKey = await pemToKey(config.payglocalPublicKey, false);
-//   const payloadStr = JSON.stringify(payload);
-
-//   return await new jose.CompactEncrypt(new TextEncoder().encode(payloadStr))
-//     .setProtectedHeader({
-//       alg: 'RSA-OAEP-256',
-//       enc: 'A128CBC-HS256',
-//       iat: iat.toString(),
-//       exp: 300000,
-//       kid: config.publicKeyId,
-//       'issued-by': config.merchantId,
-//     })
-//     .encrypt(publicKey);
-// }
-// '''
-//     },
-//     {
-//       'title': 'JWS Token Creation',
-//       'description': 'The SDK signs the JWE token to ensure authenticity.',
-//       'details': '''
-// - **Algorithm**: RS256 (RSA-SHA256)
-// - **Signed Content**: SHA-256 digest of the JWE token
-// - **Header Includes**:
-//   - Merchant ID, key ID, encryption flag
-// - **Output**: Signed JWS token
-// - **Purpose**: Verifies the request originates from the merchant
-// - **Example JWS**: `eyJpc3N1ZWQtYnkiOiJ0ZXN0bmV3Z2NjMjYiLCJhbGciOiJSUzI1NiIsImtpZCI6ImtJZC12VTZlOGw2Yld0WEs4b09LIiwieC1nbC1tZXJjaGFudElkIjoidGVzdG5ld2djYzI2IiwieC1nbC1lbmMiOiJ0cnVlIiwiaXMtZGlnZXN0ZWQiOiJ0cnVlIn0...`
-// ''',
-//       'code': '''
-// const jws = await generateJWS(jwe, config);
-
-// async function generateJWS(toDigest, config) {
-//   const iat = Date.now();
-//   const digest = crypto.createHash('sha256').update(toDigest).digest('base64');
-//   const digestObject = {
-//     digest,
-//     digestAlgorithm: 'SHA-256',
-//     exp: iat + 300000,
-//     iat: iat.toString(),
-//   };
-//   const privateKey = await pemToKey(config.merchantPrivateKey, true);
-
-//   return await new jose.SignJWT(digestObject)
-//     .setProtectedHeader({
-//       'issued-by': config.merchantId,
-//       alg: 'RS256',
-//       kid: config.privateKeyId,
-//       'x-gl-merchantId': config.merchantId,
-//       'x-gl-enc': 'true',
-//       'is-digested': 'true',
-//     })
-//     .sign(privateKey);
-// }
-// '''
-//     },
-//     {
-//       'title': 'API Request to PayGlocal',
-//       'description': 'The SDK sends a secure POST request to the PayGlocal API.',
-//       'details': '''
-// - **Endpoint**: `https://api.uat.payglocal.in/gl/v1/payments/initiate/paycollect`
-// - **Headers**:
-//   - `x-gl-token-external`: JWS token
-//   - `Content-Type`: text/plain
-// - **Body**: JWE token
-// - **Purpose**: Initiates the payment process on the server
-// ''',
-//       'code': '''
-// try {
-//   const response = await post(
-//     `payGlocal.in/gl/v1/payments/initiate/paycollect`,
-//     jwe,
-//     {
-//       'Content-Type': 'text/plain',
-//       'x-gl-token-external': jws,
-//     }
-//   );
-// }
-// '''
-//     },
-//     {
-//       'title': 'API Response',
-//       'description': 'PayGlocal returns transaction details and a redirect URL.',
-//       'details': '''
-// - **Response Fields**:
-//   - `gid`: Global transaction ID
-//   - `status`: Typically "INPROGRESS"
-//   - `redirectUrl`: URL for user redirection
-//   - `statusUrl`: URL for transaction status checks
-//   - `merchantTxnId`: Original transaction ID
-// - **Purpose**: Provides instructions for the next user action
-// ''',
-//       'code': '''
-// {
-//   gid: 'gl_o-962bd721e763755cdfss0I1X2',
-//   status: 'INPROGRESS',
-//   message: 'Transaction Created Successfully',
-//   timestamp: '21/07/2025 21:18:03',
-//   reasonCode: 'GL-201-001',
-//   data: {
-//     redirectUrl: 'https://api.uat.payglocal.in/gl/payflow-ui/...',
-//     statusUrl: 'https://api.uat.payglocal.in/gl/v1/payments/...',
-//     merchantTxnId: '1753112882385976608'
-//   },
-//   errors: null
-// }
-// '''
-//     },
-
-//   ]; // Use your existing steps
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     _initializeAnimations();
-//   }
-
-//   void _initializeAnimations() {
-//     _headerController = AnimationController(
-//       vsync: this,
-//       duration: _animationDuration,
-//     );
-//     _headerOpacity = Tween<double>(begin: 0, end: 1).animate(
-//       CurvedAnimation(parent: _headerController, curve: Curves.easeInOut),
-//     );
-
-//     _stepOffsets = [];
-//     _stepOpacities = [];
-
-//     for (var i = 0; i < _steps.length; i++) {
-//       final controller = AnimationController(
-//         vsync: this,
-//         duration: Duration(
-//             milliseconds: _stepAnimationBaseDuration + i * _stepAnimationDelay),
-//       );
-//       _stepControllers.add(controller);
-//       _stepScales.add(
-//         Tween<double>(begin: 0.9, end: 1.0).animate(
-//           CurvedAnimation(parent: controller, curve: Curves.easeOutBack),
-//         ),
-//       );
-//       _stepOffsets.add(
-//         Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
-//           CurvedAnimation(parent: controller, curve: Curves.easeOutCubic),
-//         ),
-//       );
-//       _stepOpacities.add(
-//         Tween<double>(begin: 0, end: 1).animate(
-//           CurvedAnimation(parent: controller, curve: Curves.easeIn),
-//         ),
-//       );
-//       controller.forward();
-//     }
-
-//     _arrowController = AnimationController(
-//       vsync: this,
-//       duration: const Duration(milliseconds: 1200),
-//     );
-//     _arrowAnimation = Tween<double>(begin: 0, end: 1).animate(
-//       CurvedAnimation(parent: _arrowController, curve: Curves.easeInOut),
-//     );
-//     _headerController.forward();
-//     _arrowController.forward();
-//   }
-
-//   @override
-//   void dispose() {
-//     _headerController.dispose();
-//     _arrowController.dispose();
-//     for (var controller in _stepControllers) {
-//       controller.dispose();
-//     }
-//     super.dispose();
-//   }
-
-//   void _replayAnimations() {
-//     _headerController.reset();
-//     _arrowController.reset();
-//     for (var controller in _stepControllers) {
-//       controller.reset();
-//       controller.forward();
-//     }
-//     _headerController.forward();
-//     _arrowController.forward();
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     final screenWidth = MediaQuery.of(context).size.width;
-//     final isLargeScreen = screenWidth > 600;
-
-//     return Theme(
-//       data: ThemeData(
-//         primaryColor: _primaryColor,
-//         colorScheme:
-//             ColorScheme.fromSwatch().copyWith(secondary: _accentColor),
-//         scaffoldBackgroundColor: _backgroundColor,
-//       ),
-//       child: Scaffold(
-//         appBar: _buildAppBar(isLargeScreen),
-//         body: SafeArea(
-//           child: SingleChildScrollView(
-//             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-//             child: Column(
-//               crossAxisAlignment: CrossAxisAlignment.start,
-//               children: [
-//                 _buildHeader(isLargeScreen),
-//                 const SizedBox(height: 24),
-//                 AnimatedBuilder(
-//                   animation: _arrowAnimation,
-//                   builder: (context, _) => CustomPaint(
-//                     painter:
-//                         ArrowPainter(_steps.length, screenWidth, _arrowAnimation.value),
-//                     child: Column(
-//                       children: _steps.asMap().entries.map((entry) {
-//                         return _buildStepCard(
-//                             entry.key, entry.value, isLargeScreen);
-//                       }).toList(),
-//                     ),
-//                   ),
-//                 )
-//               ],
-//             ),
-//           ),
-//         ),
-//         floatingActionButton: _buildReplayButton(),
-//       ),
-//     );
-//   }
-
-//   PreferredSizeWidget _buildAppBar(bool isLargeScreen) {
-//     return AppBar(
-//       title: Text(
-//         'PayGlocal Payment Flow',
-//         style: GoogleFonts.poppins(
-//           fontSize: isLargeScreen ? 24 : 20,
-//           fontWeight: FontWeight.w600,
-//           color: Colors.white,
-//         ),
-//       ),
-//       backgroundColor: _primaryColor,
-//       elevation: 2,
-//       shadowColor: Colors.black.withOpacity(0.2),
-//     );
-//   }
-
-//   Widget _buildHeader(bool isLargeScreen) {
-//     return FadeTransition(
-//       opacity: _headerOpacity,
-//       child: Container(
-//         padding: const EdgeInsets.all(16),
-//         decoration: BoxDecoration(
-//           color: Colors.white,
-//           borderRadius: BorderRadius.circular(12),
-//           boxShadow: [
-//             BoxShadow(
-//               color: Colors.black.withOpacity(0.1),
-//               blurRadius: 8,
-//               offset: const Offset(0, 4),
-//             ),
-//           ],
-//         ),
-//         child: Column(
-//           crossAxisAlignment: CrossAxisAlignment.start,
-//           children: [
-//             Text(
-//               'Payment Flow Visualizer',
-//               style: GoogleFonts.poppins(
-//                 fontSize: isLargeScreen ? 28 : 24,
-//                 fontWeight: FontWeight.bold,
-//                 color: _primaryColor,
-//               ),
-//             ),
-//             const SizedBox(height: 8),
-//             Text(
-//               'An interactive guide to the PayGlocal payment process, from user action to server response.',
-//               style: GoogleFonts.poppins(
-//                 fontSize: isLargeScreen ? 16 : 14,
-//                 color: _textColor,
-//               ),
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-
-//   Widget _buildStepCard(
-//       int index, Map<String, String> step, bool isLargeScreen) {
-//     return SlideTransition(
-//       position: _stepOffsets[index],
-//       child: FadeTransition(
-//         opacity: _stepOpacities[index],
-//         child: Transform.scale(
-//           scale: _stepScales[index].value,
-//           child: Column(
-//             children: [
-//               Card(
-//                 elevation: 4,
-//                 shape: RoundedRectangleBorder(
-//                     borderRadius: BorderRadius.circular(12)),
-//                 margin: const EdgeInsets.symmetric(vertical: 8),
-//                 child: ExpansionTile(
-//                   tilePadding:
-//                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-//                   childrenPadding: const EdgeInsets.all(16),
-//                   leading: CircleAvatar(
-//                     backgroundColor: _accentColor.withOpacity(0.1),
-//                     child: Text(
-//                       '${index + 1}',
-//                       style: GoogleFonts.poppins(
-//                         fontSize: 16,
-//                         fontWeight: FontWeight.bold,
-//                         color: _accentColor,
-//                       ),
-//                     ),
-//                   ),
-//                   title: Text(
-//                     step['title']!,
-//                     style: GoogleFonts.poppins(
-//                       fontSize: isLargeScreen ? 18 : 16,
-//                       fontWeight: FontWeight.w600,
-//                       color: _primaryColor,
-//                     ),
-//                   ),
-//                   subtitle: Padding(
-//                     padding: const EdgeInsets.only(top: 8),
-//                     child: Text(
-//                       step['description']!,
-//                       style: GoogleFonts.poppins(
-//                         fontSize: isLargeScreen ? 14 : 12,
-//                         color: _textColor,
-//                       ),
-//                     ),
-//                   ),
-//                   children: [
-//                     SelectableText(
-//                       step['details']!,
-//                       style: GoogleFonts.robotoMono(
-//                         fontSize: isLargeScreen ? 14 : 12,
-//                         color: _textColor,
-//                       ),
-//                     ),
-//                     if (step['code'] != null) ...[
-//                       const SizedBox(height: 16),
-//                       Container(
-//                         padding: const EdgeInsets.all(12),
-//                         decoration: BoxDecoration(
-//                           color: _backgroundColor,
-//                           borderRadius: BorderRadius.circular(8),
-//                         ),
-//                         child: SelectableText(
-//                           step['code']!,
-//                           style: GoogleFonts.robotoMono(
-//                             fontSize: isLargeScreen ? 13 : 11,
-//                             color: _textColor,
-//                           ),
-//                         ),
-//                       ),
-//                     ],
-//                   ],
-//                   onExpansionChanged: (expanded) {
-//                     setState(() {
-//                       _expandedStates[index] = expanded;
-//                     });
-//                   },
-//                 ),
-//               ),
-//               if (index < _steps.length - 1) const SizedBox(height: 40),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-
-//   Widget _buildReplayButton() {
-//     return FloatingActionButton(
-//       onPressed: _replayAnimations,
-//       backgroundColor: _accentColor,
-//       tooltip: 'Replay Animations',
-//       child: const Icon(Icons.replay, color: Colors.white),
-//     );
-//   }
-// }
-
-// class ArrowPainter extends CustomPainter {
-//   final int stepCount;
-//   final double screenWidth;
-//   final double progress;
-
-//   ArrowPainter(this.stepCount, this.screenWidth, this.progress);
-
-//   @override
-//   void paint(Canvas canvas, Size size) {
-//     final paint = Paint()
-//       ..color = _FlowVisualizerPageState._textColor.withOpacity(0.5)
-//       ..style = PaintingStyle.stroke
-//       ..strokeWidth = 2;
-
-//     const stepHeight = 80.0;
-//     const spacing = 40.0;
-//     const arrowHeadSize = 8.0;
-
-//     for (var i = 0; i < stepCount - 1; i++) {
-//       final startY = (i + 1) * (stepHeight + spacing) - spacing / 2;
-//       final endY = (i + 1) * (stepHeight + spacing) + spacing / 2;
-//       final currentProgress = (i + 1) / stepCount;
-//       if (progress >= currentProgress) {
-//         canvas.drawLine(
-//           Offset(screenWidth / 2, startY),
-//           Offset(screenWidth / 2, endY),
-//           paint,
-//         );
-//         final path = Path()
-//           ..moveTo(screenWidth / 2 - arrowHeadSize, endY - arrowHeadSize)
-//           ..lineTo(screenWidth / 2, endY)
-//           ..lineTo(screenWidth / 2 + arrowHeadSize, endY - arrowHeadSize)
-//           ..close();
-//         canvas.drawPath(path, paint..style = PaintingStyle.fill);
-//       }
-//     }
-//   }
-
-//   @override
-//   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-// }
+// Pretty JSON helpers and payloads
+String _prettyJson(Map<String, dynamic> json) => const JsonEncoder.withIndent('  ').convert(json);

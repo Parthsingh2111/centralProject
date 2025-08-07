@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../widgets/shared_app_bar.dart';
 
 class PayCollectScreen extends StatefulWidget {
   const PayCollectScreen({Key? key}) : super(key: key);
@@ -103,74 +104,9 @@ class _PayCollectScreenState extends State<PayCollectScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(70),
-        child: AppBar(
-          flexibleSpace: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
-            ),
-          ),
-          elevation: 4,
-          shadowColor: Colors.black.withOpacity(0.2),
-          title: FadeTransition(
-            opacity: _appBarFadeAnimation,
-            child: Text(
-              'PayCollect Payment Methods',
-              style: GoogleFonts.poppins(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: FadeTransition(
-                opacity: _appBarFadeAnimation,
-                child: ElevatedButton(
-                  onPressed: () {
-                    try {
-                      Navigator.pushNamed(context, '/services');
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Services route not found'),
-                        ),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF3B82F6),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    elevation: 2,
-                  ),
-                  child: Text(
-                    'Services',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF3B82F6),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+      appBar: SharedAppBar(
+        title: 'PayCollect Payment Methods',
+        fadeAnimation: _appBarFadeAnimation,
       ),
       body: SafeArea(
         child: SingleChildScrollView(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../widgets/shared_app_bar.dart';
 
 class PayDirectScreen extends StatefulWidget {
   const PayDirectScreen({Key? key}) : super(key: key);
@@ -114,74 +115,9 @@ class _PayDirectScreenState extends State<PayDirectScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(70),
-        child: AppBar(
-          flexibleSpace: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
-            ),
-          ),
-          elevation: 4,
-          shadowColor: Colors.black.withOpacity(0.2),
-          title: FadeTransition(
-            opacity: _appBarFadeAnimation,
-            child: Text(
-              'PayDirect Payment Methods',
-              style: GoogleFonts.poppins(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: FadeTransition(
-                opacity: _appBarFadeAnimation,
-                child: ElevatedButton(
-                  onPressed: () {
-                    try {
-                      Navigator.pushNamed(context, '/services');
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Services route not found'),
-                        ),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF3B82F6),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    elevation: 2,
-                  ),
-                  child: Text(
-                    'Services',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF3B82F6),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+      appBar: SharedAppBar(
+        title: 'PayDirect Payment Methods',
+        fadeAnimation: _appBarFadeAnimation,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -703,10 +639,10 @@ class _FAQSectionState extends State<_FAQSection> {
       {
         'question': 'For whom is the PayDirect method designed?',
         'answer':
-            'PayDirect is designed for PCI DSS certified merchants who prefer to collect card details directly on their own interface. It’s ideal for businesses like e-commerce platforms, subscription services, or travel agencies that want to control the payment UI while ensuring secure processing through PayGlocal.',
+            'PayDirect is designed for PCI DSS certified merchants who prefer to collect card details directly on their own interface. It\'s ideal for businesses like e-commerce platforms, subscription services, or travel agencies that want to control the payment UI while ensuring secure processing through PayGlocal.',
       },
       {
-        'question': 'What if a merchant doesn’t want to collect card details directly?',
+        'question': 'What if a merchant doesn\'t want to collect card details directly?',
         'answer':
             'Merchants who prefer not to handle card details directly should use the PayCollect method. PayCollect allows PayGlocal to manage card data securely, ensuring compliance without requiring merchants to maintain PCI DSS certification.',
       },
@@ -718,18 +654,18 @@ class _FAQSectionState extends State<_FAQSection> {
       {
         'question': 'What is this demo website for?',
         'answer':
-            'This demo website showcases PayGlocal’s PayDirect integration, including JWT PayDirect, SI PayDirect, and Auth & Capture. It provides minimum required API payload fields to simplify onboarding. For full payload details, merchants can refer to our comprehensive documentation.',
+            'This demo website showcases PayGlocal\'s PayDirect integration, including JWT PayDirect, SI PayDirect, and Auth & Capture. It provides minimum required API payload fields to simplify onboarding. For full payload details, merchants can refer to our comprehensive documentation.',
       },
       {
         'question': 'What support is available for integrating PayDirect?',
         'answer':
             'PayGlocal provides dedicated integration support, including SDKs, detailed documentation, and a technical support team. Merchants can contact our integration team via the "Contact Us" page for assistance with API setup, testing, or resolving queries.',
       },
-      {
-        'question': 'Can PayDirect be used with other payment methods?',
-        'answer':
-            'Yes, PayDirect can be integrated with other payment methods like UPI, net banking, or wallets, depending on the merchant’s requirements and PayGlocal’s supported gateways. Contact our support team to configure multi-method payment solutions.',
-      },
+      // {
+      //   'question': 'Can PayDirect be used with other payment methods?',
+      //   'answer':
+      //       'Yes, PayDirect can be integrated with other payment methods like UPI, net banking, or wallets, depending on the merchant's requirements and PayGlocal's supported gateways. Contact our support team to configure multi-method payment solutions.',
+      // },
     ];
 
     return Container(
@@ -742,7 +678,7 @@ class _FAQSectionState extends State<_FAQSection> {
             color: Colors.black.withOpacity(0.1),
             blurRadius: 12,
             offset: const Offset(0, 4),
-          ),
+            ),
         ],
         border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
       ),
