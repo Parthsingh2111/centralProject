@@ -388,7 +388,7 @@ Fixed Standing Instructions (SI) enable automated recurring payments of a predef
 
 *Contact PayGlocal support to configure Fixed SI for your merchant account.*
 ''',
-                            route: '/ott_subscription_checkout',
+                            route: 'paycollect/ott_subscription_checkout',
                             icon: Icons.repeat,
                             badge: 'Fixed SI',
                             badgeColor: const Color(0xFF3B82F6),
@@ -449,7 +449,7 @@ Variable Standing Instructions (SI) enable automated recurring payments where th
 
 *Contact PayGlocal support to configure Variable SI for your merchant account.*
 ''',
-                            route: '/bill_payment',
+                            route: 'paycollect/bill_payment',
                             icon: Icons.repeat,
                             badge: 'Variable SI',
                             badgeColor: const Color(0xFFFFA500),

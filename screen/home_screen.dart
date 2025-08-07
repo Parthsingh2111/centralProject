@@ -27,7 +27,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     )..forward();
     _fadeAnimation = CurvedAnimation(
       parent: _fadeController,
-      curve: Curves.easeInOutCirc, // Changed from easeIn
+      curve: Curves.easeInOutCirc,
     );
     // Fade animation for app bar
     _appBarFadeController = AnimationController(
@@ -117,6 +117,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
             ),
+            IconButton(
+              icon: const Icon(Icons.visibility),
+              tooltip: 'Visualize the Flow',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => FlowVisualizerPage()),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -130,6 +140,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // Hero Section
+                  Center(child: Text('Click "Visualize the Flow" to see the payment process')),
                   FadeTransition(
                     opacity: _fadeAnimation,
                     child: Container(
@@ -990,3 +1001,1058 @@ class _ProductCardState extends State<_ProductCard> with TickerProviderStateMixi
     );
   }
 }
+
+class FlowVisualizerPage extends StatefulWidget {
+  const FlowVisualizerPage({super.key});
+
+  @override
+  State<FlowVisualizerPage> createState() => _FlowVisualizerPageState();
+}
+
+class _FlowVisualizerPageState extends State<FlowVisualizerPage> with TickerProviderStateMixin {
+  static const _animationDuration = Duration(seconds: 2);
+  static const _stepAnimationBaseDuration = 500;
+  static const _stepAnimationDelay = 200;
+  static const _primaryColor = Color(0xFF1E3A8A);
+  static const _accentColor = Color(0xFF3B82F6);
+  static const _backgroundColor = Color(0xFFF8FAFC);
+  static const _textColor = Color(0xFF4B5563);
+
+  late AnimationController _headerController;
+  late Animation<double> _headerOpacity;
+  final List<bool> _expandedStates = List.generate(7, (_) => false);
+  final List<AnimationController> _stepControllers = [];
+  final List<Animation<double>> _stepScales = [];
+
+  final List<Map<String, String>> _steps = [
+    {
+      'title': 'User Initiates Payment',
+      'description': 'Customer clicks the "Pay Now" button on the checkout screen.',
+      'details': '''
+- **Action**: User triggers the payment process by clicking "Pay Now".
+- **Result**: The app invokes the PayGlocal SDK to start the payment flow.
+- **Note**: This is a front-end event; no backend processing occurs yet.
+''',
+      'code': '''
+// User clicks the "Pay Now" button
+payment = initiateJwtPayment(payload);
+'''
+    },
+    {
+      'title': 'Payload Sent to SDK',
+      'description': 'The app sends payment details to the PayGlocal SDK.',
+      'details': '''
+- **Function Called**: `initiateJwtPayment(payload)`
+- **Payload Includes**:
+  - `merchantTxnId`: Unique transaction identifier
+  - `paymentData`: Amount and currency details
+  - `merchantCallbackURL`: URL for post-payment redirection
+- **Purpose**: Prepares data for secure processing and API interaction.
+''',
+      'code': '''
+async initiateJwtPayment(params) {
+  return initiateJwtPayment(params, this.config);
+}
+'''
+    },
+    {
+      'title': 'SDK Validates Payload',
+      'description': 'The SDK checks for required fields and schema validity.',
+      'details': '''
+- **Validation Checks**:
+  - Ensures `merchantTxnId` is not empty
+  - Verifies `paymentData` includes amount and currency
+  - Confirms `merchantCallbackURL` is valid
+- **Error Handling**: Throws descriptive errors for invalid payloads
+- **Purpose**: Ensures data integrity before proceeding
+''',
+      'code': '''
+async function initiateJwtPayment(payload, config) {
+  const { merchantTxnId, paymentData, merchantCallbackURL } = payload;
+  try {
+    validatePaycollectPayload(payload);
+  } catch (err) {
+    // throw new Error(`Schema validation failed: 
+  }
+  validateRequiredFields(
+    {
+      merchantTxnId,
+      paymentData,
+      merchantCallbackURL,
+      'paymentData.totalAmount': paymentData?.totalAmount,
+      'paymentData.txnCurrency': paymentData?.txnCurrency,
+    },
+    [
+      'merchantTxnId',
+      'paymentData',
+      'merchantCallbackURL',
+      'paymentData.totalAmount',
+      'paymentData.txnCurrency',
+    ]
+  );
+}
+'''
+    },
+    {
+      'title': 'JWE Token Creation',
+      'description': 'The SDK encrypts the payload into a secure JWE token.',
+      'details': '''
+- **Encryption**:
+  - Key: RSA-OAEP-256
+  - Content: A128CBC-HS256
+- **Token Contents**:
+  - Issued time, expiration, key ID, merchant ID
+- **Output**: Compact JWE string
+- **Purpose**: Secures sensitive data for API transmission
+- **Example JWE**: `eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2IiwiaWF0IjoiMTc1MzExMjg4MjUxMiIsImV4cCI6MzAwMDAwLCJraWQiOiJrSWQteUx0Umt5NDhYMkhxVzMwayIsImlzc3VlZC1ieSI6InRlc3RuZXdnY2MyNiJ9...`
+''',
+      'code': '''
+const jwe = await generateJWE(payload, config);
+
+async function generateJWE(payload, config) {
+  const iat = Date.now();
+  const publicKey = await pemToKey(config.payglocalPublicKey, false);
+  const payloadStr = JSON.stringify(payload);
+
+  return await new jose.CompactEncrypt(new TextEncoder().encode(payloadStr))
+    .setProtectedHeader({
+      alg: 'RSA-OAEP-256',
+      enc: 'A128CBC-HS256',
+      iat: iat.toString(),
+      exp: 300000,
+      kid: config.publicKeyId,
+      'issued-by': config.merchantId,
+    })
+    .encrypt(publicKey);
+}
+'''
+    },
+    {
+      'title': 'JWS Token Creation',
+      'description': 'The SDK signs the JWE token to ensure authenticity.',
+      'details': '''
+- **Algorithm**: RS256 (RSA-SHA256)
+- **Signed Content**: SHA-256 digest of the JWE token
+- **Header Includes**:
+  - Merchant ID, key ID, encryption flag
+- **Output**: Signed JWS token
+- **Purpose**: Verifies the request originates from the merchant
+- **Example JWS**: `eyJpc3N1ZWQtYnkiOiJ0ZXN0bmV3Z2NjMjYiLCJhbGciOiJSUzI1NiIsImtpZCI6ImtJZC12VTZlOGw2Yld0WEs4b09LIiwieC1nbC1tZXJjaGFudElkIjoidGVzdG5ld2djYzI2IiwieC1nbC1lbmMiOiJ0cnVlIiwiaXMtZGlnZXN0ZWQiOiJ0cnVlIn0...`
+''',
+      'code': '''
+const jws = await generateJWS(jwe, config);
+
+async function generateJWS(toDigest, config) {
+  const iat = Date.now();
+  const digest = crypto.createHash('sha256').update(toDigest).digest('base64');
+  const digestObject = {
+    digest,
+    digestAlgorithm: 'SHA-256',
+    exp: iat + 300000,
+    iat: iat.toString(),
+  };
+  const privateKey = await pemToKey(config.merchantPrivateKey, true);
+
+  return await new jose.SignJWT(digestObject)
+    .setProtectedHeader({
+      'issued-by': config.merchantId,
+      alg: 'RS256',
+      kid: config.privateKeyId,
+      'x-gl-merchantId': config.merchantId,
+      'x-gl-enc': 'true',
+      'is-digested': 'true',
+    })
+    .sign(privateKey);
+}
+'''
+    },
+    {
+      'title': 'API Request to PayGlocal',
+      'description': 'The SDK sends a secure POST request to the PayGlocal API.',
+      'details': '''
+- **Endpoint**: `https://api.uat.payglocal.in/gl/v1/payments/initiate/paycollect`
+- **Headers**:
+  - `x-gl-token-external`: JWS token
+  - `Content-Type`: text/plain
+- **Body**: JWE token
+- **Purpose**: Initiates the payment process on the server
+''',
+      'code': '''
+try {
+  // logger.info(`Initiating JWT payment:
+  const response = await post(
+    `payglocal.in/gl/v1/payments/initiate/paycollect`,
+    jwe,
+    {
+      'Content-Type': 'text/plain',
+      'x-gl-token-external': jws,
+    }
+  );
+}
+'''
+    },
+    {
+      'title': 'API Response',
+      'description': 'PayGlocal returns transaction details and a redirect URL.',
+      'details': '''
+- **Response Fields**:
+  - `gid`: Global transaction ID
+  - `status`: Typically "INPROGRESS"
+  - `redirectUrl`: URL for user redirection
+  - `statusUrl`: URL for transaction status checks
+  - `merchantTxnId`: Original transaction ID
+- **Purpose**: Provides instructions for the next user action
+''',
+      'code': '''
+{
+  gid: 'gl_o-962bd721e763755cdfss0I1X2',
+  status: 'INPROGRESS',
+  message: 'Transaction Created Successfully',
+  timestamp: '21/07/2025 21:18:03',
+  reasonCode: 'GL-201-001',
+  data: {
+    redirectUrl: 'https://api.uat.payglocal.in/gl/payflow-ui/...',
+    statusUrl: 'https://api.uat.payglocal.in/gl/v1/payments/...',
+    merchantTxnId: '1753112882385976608'
+  },
+  errors: null
+}
+'''
+    },
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeAnimations();
+  }
+
+  void _initializeAnimations() {
+    _headerController = AnimationController(
+      vsync: this,
+      duration: _animationDuration,
+    );
+    _headerOpacity = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _headerController, curve: Curves.easeInOut),
+    );
+
+    for (var i = 0; i < _steps.length; i++) {
+      final controller = AnimationController(
+        vsync: this,
+        duration: Duration(milliseconds: _stepAnimationBaseDuration + i * _stepAnimationDelay),
+      );
+      _stepControllers.add(controller);
+      _stepScales.add(
+        Tween<double>(begin: 0.8, end: 1.0).animate(
+          CurvedAnimation(parent: controller, curve: Curves.easeOutCubic),
+        ),
+      );
+      controller.forward();
+    }
+    _headerController.forward();
+  }
+
+  @override
+  void dispose() {
+    _headerController.dispose();
+    for (var controller in _stepControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _replayAnimations() {
+    _headerController.reset();
+    for (var controller in _stepControllers) {
+      controller.reset();
+      controller.forward();
+    }
+    _headerController.forward();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isLargeScreen = screenWidth > 600;
+
+    return Theme(
+      data: ThemeData(
+        primaryColor: _primaryColor,
+        colorScheme: ColorScheme.fromSwatch().copyWith(secondary: _accentColor),
+        scaffoldBackgroundColor: _backgroundColor,
+      ),
+      child: Scaffold(
+        appBar: _buildAppBar(isLargeScreen),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(isLargeScreen),
+                const SizedBox(height: 24),
+                CustomPaint(
+                  painter: ArrowPainter(_steps.length, screenWidth),
+                  child: Column(
+                    children: _steps.asMap().entries.map((entry) {
+                      return _buildStepCard(entry.key, entry.value, isLargeScreen);
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        floatingActionButton: _buildReplayButton(),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(bool isLargeScreen) {
+    return AppBar(
+      title: Text(
+        'PayGlocal Payment Flow',
+        style: GoogleFonts.poppins(
+          fontSize: isLargeScreen ? 24 : 20,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+      ),
+      backgroundColor: _primaryColor,
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(0.2),
+    );
+  }
+
+  Widget _buildHeader(bool isLargeScreen) {
+    return FadeTransition(
+      opacity: _headerOpacity,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Payment Flow Visualizer',
+              style: GoogleFonts.poppins(
+                fontSize: isLargeScreen ? 28 : 24,
+                fontWeight: FontWeight.bold,
+                color: _primaryColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'An interactive guide to the PayGlocal payment process, from user action to server response.',
+              style: GoogleFonts.poppins(
+                fontSize: isLargeScreen ? 16 : 14,
+                color: _textColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepCard(int index, Map<String, String> step, bool isLargeScreen) {
+    return AnimatedBuilder(
+      animation: _stepControllers[index],
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _stepScales[index].value,
+          child: Column(
+            children: [
+              Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                child: ExpansionTile(
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  childrenPadding: const EdgeInsets.all(16),
+                  leading: CircleAvatar(
+                    backgroundColor: _accentColor.withOpacity(0.1),
+                    child: Text(
+                      '${index + 1}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _accentColor,
+                      ),
+                    ),
+                  ),
+                  title: Text(
+                    step['title']!,
+                    style: GoogleFonts.poppins(
+                      fontSize: isLargeScreen ? 18 : 16,
+                      fontWeight: FontWeight.w600,
+                      color: _primaryColor,
+                    ),
+                  ),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      step['description']!,
+                      style: GoogleFonts.poppins(
+                        fontSize: isLargeScreen ? 14 : 12,
+                        color: _textColor,
+                      ),
+                    ),
+                  ),
+                  children: [
+                    SelectableText(
+                      step['details']!,
+                      style: GoogleFonts.robotoMono(
+                        fontSize: isLargeScreen ? 14 : 12,
+                        color: _textColor,
+                      ),
+                    ),
+                    if (step['code'] != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _backgroundColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: SelectableText(
+                          step['code']!,
+                          style: GoogleFonts.robotoMono(
+                            fontSize: isLargeScreen ? 13 : 11,
+                            color: _textColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                  onExpansionChanged: (expanded) {
+                    setState(() {
+                      _expandedStates[index] = expanded;
+                    });
+                  },
+                ),
+              ),
+              if (index < _steps.length - 1) const SizedBox(height: 40),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildReplayButton() {
+    return FloatingActionButton.extended(
+      onPressed: _replayAnimations,
+      label: const Text('Replay Animations'),
+      icon: const Icon(Icons.replay),
+      backgroundColor: _accentColor,
+      tooltip: 'Replay all animations',
+    );
+  }
+}
+
+class ArrowPainter extends CustomPainter {
+  final int stepCount;
+  final double screenWidth;
+
+  ArrowPainter(this.stepCount, this.screenWidth);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = _FlowVisualizerPageState._textColor.withOpacity(0.5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    const stepHeight = 80.0;
+    const spacing = 40.0;
+    const arrowHeadSize = 8.0;
+
+    for (var i = 0; i < stepCount - 1; i++) {
+      final startY = (i + 1) * (stepHeight + spacing) - spacing / 2;
+      final endY = (i + 1) * (stepHeight + spacing) + spacing / 2;
+
+      canvas.drawLine(
+        Offset(screenWidth / 2, startY),
+        Offset(screenWidth / 2, endY),
+        paint,
+      );
+
+      final path = Path()
+        ..moveTo(screenWidth / 2 - arrowHeadSize, endY - arrowHeadSize)
+        ..lineTo(screenWidth / 2, endY)
+        ..lineTo(screenWidth / 2 + arrowHeadSize, endY - arrowHeadSize)
+        ..close();
+      canvas.drawPath(path, paint..style = PaintingStyle.fill);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// class FlowVisualizerPage extends StatefulWidget {
+//   const FlowVisualizerPage({super.key});
+
+//   @override
+//   State<FlowVisualizerPage> createState() => _FlowVisualizerPageState();
+// }
+
+// class _FlowVisualizerPageState extends State<FlowVisualizerPage>
+//     with TickerProviderStateMixin {
+//   static const _animationDuration = Duration(seconds: 2);
+//   static const _stepAnimationBaseDuration = 500;
+//   static const _stepAnimationDelay = 200;
+//   static const _primaryColor = Color(0xFF1E3A8A);
+//   static const _accentColor = Color(0xFF3B82F6);
+//   static const _backgroundColor = Color(0xFFF8FAFC);
+//   static const _textColor = Color(0xFF4B5563);
+
+//   late AnimationController _headerController;
+//   late Animation<double> _headerOpacity;
+//   final List<bool> _expandedStates = List.generate(7, (_) => false);
+//   final List<AnimationController> _stepControllers = [];
+//   final List<Animation<double>> _stepScales = [];
+//   late List<Animation<Offset>> _stepOffsets;
+//   late List<Animation<double>> _stepOpacities;
+//   late AnimationController _arrowController;
+//   late Animation<double> _arrowAnimation;
+
+//   final List<Map<String, String>> _steps = [
+//  {
+//       'title': 'User Initiates Payment',
+//       'description': 'Customer clicks the "Pay Now" button on the checkout screen.',
+//       'details': '''
+// - **Action**: User triggers the payment process by clicking "Pay Now".
+// - **Result**: The app invokes the PayGlocal SDK to start the payment flow.
+// - **Note**: This is a front-end event; no backend processing occurs yet.
+// ''',
+//       'code': '''
+// // User clicks the "Pay Now" button
+// payment = initiateJwtPayment(payload);
+// '''
+//     },
+//     {
+//       'title': 'Payload Sent to SDK',
+//       'description': 'The app sends payment details to the PayGlocal SDK.',
+//       'details': '''
+// - **Function Called**: `initiateJwtPayment(payload)`
+// - **Payload Includes**:
+//   - `merchantTxnId`: Unique transaction identifier
+//   - `paymentData`: Amount and currency details
+//   - `merchantCallbackURL`: URL for post-payment redirection
+// - **Purpose**: Prepares data for secure processing and API interaction.
+// ''',
+//       'code': '''
+// async initiateJwtPayment(params) {
+//   return initiateJwtPayment(params, this.config);
+// }
+// '''
+//     },
+//     {
+//       'title': 'SDK Validates Payload',
+//       'description': 'The SDK checks for required fields and schema validity.',
+//       'details': '''
+// - **Validation Checks**:
+//   - Ensures `merchantTxnId` is not empty
+//   - Verifies `paymentData` includes amount and currency
+//   - Confirms `merchantCallbackURL` is valid
+// - **Error Handling**: Throws descriptive errors for invalid payloads
+// - **Purpose**: Ensures data integrity before proceeding
+// ''',
+//       'code': '''
+// async function initiateJwtPayment(payload, config) {
+//   const { merchantTxnId, paymentData, merchantCallbackURL } = payload;
+//   try {
+//     validatePaycollectPayload(payload);
+//   } catch (err) {
+//     throw new Error(`Schema validation failed: error`);
+//   }
+//   validateRequiredFields(
+//     {
+//       merchantTxnId,
+//       paymentData,
+//       merchantCallbackURL,
+//       'paymentData.totalAmount': paymentData?.totalAmount,
+//       'paymentData.txnCurrency': paymentData?.txnCurrency,
+//     },
+//     [
+//       'merchantTxnId',
+//       'paymentData',
+//       'merchantCallbackURL',
+//       'paymentData.totalAmount',
+//       'paymentData.txnCurrency',
+//     ]
+//   );
+// }
+// '''
+//     },
+//     {
+//       'title': 'JWE Token Creation',
+//       'description': 'The SDK encrypts the payload into a secure JWE token.',
+//       'details': '''
+// - **Encryption**:
+//   - Key: RSA-OAEP-256
+//   - Content: A128CBC-HS256
+// - **Token Contents**:
+//   - Issued time, expiration, key ID, merchant ID
+// - **Output**: Compact JWE string
+// - **Purpose**: Secures sensitive data for API transmission
+// - **Example JWE**: `eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2IiwiaWF0IjoiMTc1MzExMjg4MjUxMiIsImV4cCI6MzAwMDAwLCJraWQiOiJrSWQteUx0Umt5NDhYMkhxVzMwayIsImlzc3VlZC1ieSI6InRlc3RuZXdnY2MyNiJ9...`
+// ''',
+//       'code': '''
+// const jwe = await generateJWE(payload, config);
+
+// async function generateJWE(payload, config) {
+//   const iat = Date.now();
+//   const publicKey = await pemToKey(config.payglocalPublicKey, false);
+//   const payloadStr = JSON.stringify(payload);
+
+//   return await new jose.CompactEncrypt(new TextEncoder().encode(payloadStr))
+//     .setProtectedHeader({
+//       alg: 'RSA-OAEP-256',
+//       enc: 'A128CBC-HS256',
+//       iat: iat.toString(),
+//       exp: 300000,
+//       kid: config.publicKeyId,
+//       'issued-by': config.merchantId,
+//     })
+//     .encrypt(publicKey);
+// }
+// '''
+//     },
+//     {
+//       'title': 'JWS Token Creation',
+//       'description': 'The SDK signs the JWE token to ensure authenticity.',
+//       'details': '''
+// - **Algorithm**: RS256 (RSA-SHA256)
+// - **Signed Content**: SHA-256 digest of the JWE token
+// - **Header Includes**:
+//   - Merchant ID, key ID, encryption flag
+// - **Output**: Signed JWS token
+// - **Purpose**: Verifies the request originates from the merchant
+// - **Example JWS**: `eyJpc3N1ZWQtYnkiOiJ0ZXN0bmV3Z2NjMjYiLCJhbGciOiJSUzI1NiIsImtpZCI6ImtJZC12VTZlOGw2Yld0WEs4b09LIiwieC1nbC1tZXJjaGFudElkIjoidGVzdG5ld2djYzI2IiwieC1nbC1lbmMiOiJ0cnVlIiwiaXMtZGlnZXN0ZWQiOiJ0cnVlIn0...`
+// ''',
+//       'code': '''
+// const jws = await generateJWS(jwe, config);
+
+// async function generateJWS(toDigest, config) {
+//   const iat = Date.now();
+//   const digest = crypto.createHash('sha256').update(toDigest).digest('base64');
+//   const digestObject = {
+//     digest,
+//     digestAlgorithm: 'SHA-256',
+//     exp: iat + 300000,
+//     iat: iat.toString(),
+//   };
+//   const privateKey = await pemToKey(config.merchantPrivateKey, true);
+
+//   return await new jose.SignJWT(digestObject)
+//     .setProtectedHeader({
+//       'issued-by': config.merchantId,
+//       alg: 'RS256',
+//       kid: config.privateKeyId,
+//       'x-gl-merchantId': config.merchantId,
+//       'x-gl-enc': 'true',
+//       'is-digested': 'true',
+//     })
+//     .sign(privateKey);
+// }
+// '''
+//     },
+//     {
+//       'title': 'API Request to PayGlocal',
+//       'description': 'The SDK sends a secure POST request to the PayGlocal API.',
+//       'details': '''
+// - **Endpoint**: `https://api.uat.payglocal.in/gl/v1/payments/initiate/paycollect`
+// - **Headers**:
+//   - `x-gl-token-external`: JWS token
+//   - `Content-Type`: text/plain
+// - **Body**: JWE token
+// - **Purpose**: Initiates the payment process on the server
+// ''',
+//       'code': '''
+// try {
+//   const response = await post(
+//     `payGlocal.in/gl/v1/payments/initiate/paycollect`,
+//     jwe,
+//     {
+//       'Content-Type': 'text/plain',
+//       'x-gl-token-external': jws,
+//     }
+//   );
+// }
+// '''
+//     },
+//     {
+//       'title': 'API Response',
+//       'description': 'PayGlocal returns transaction details and a redirect URL.',
+//       'details': '''
+// - **Response Fields**:
+//   - `gid`: Global transaction ID
+//   - `status`: Typically "INPROGRESS"
+//   - `redirectUrl`: URL for user redirection
+//   - `statusUrl`: URL for transaction status checks
+//   - `merchantTxnId`: Original transaction ID
+// - **Purpose**: Provides instructions for the next user action
+// ''',
+//       'code': '''
+// {
+//   gid: 'gl_o-962bd721e763755cdfss0I1X2',
+//   status: 'INPROGRESS',
+//   message: 'Transaction Created Successfully',
+//   timestamp: '21/07/2025 21:18:03',
+//   reasonCode: 'GL-201-001',
+//   data: {
+//     redirectUrl: 'https://api.uat.payglocal.in/gl/payflow-ui/...',
+//     statusUrl: 'https://api.uat.payglocal.in/gl/v1/payments/...',
+//     merchantTxnId: '1753112882385976608'
+//   },
+//   errors: null
+// }
+// '''
+//     },
+
+//   ]; // Use your existing steps
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _initializeAnimations();
+//   }
+
+//   void _initializeAnimations() {
+//     _headerController = AnimationController(
+//       vsync: this,
+//       duration: _animationDuration,
+//     );
+//     _headerOpacity = Tween<double>(begin: 0, end: 1).animate(
+//       CurvedAnimation(parent: _headerController, curve: Curves.easeInOut),
+//     );
+
+//     _stepOffsets = [];
+//     _stepOpacities = [];
+
+//     for (var i = 0; i < _steps.length; i++) {
+//       final controller = AnimationController(
+//         vsync: this,
+//         duration: Duration(
+//             milliseconds: _stepAnimationBaseDuration + i * _stepAnimationDelay),
+//       );
+//       _stepControllers.add(controller);
+//       _stepScales.add(
+//         Tween<double>(begin: 0.9, end: 1.0).animate(
+//           CurvedAnimation(parent: controller, curve: Curves.easeOutBack),
+//         ),
+//       );
+//       _stepOffsets.add(
+//         Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+//           CurvedAnimation(parent: controller, curve: Curves.easeOutCubic),
+//         ),
+//       );
+//       _stepOpacities.add(
+//         Tween<double>(begin: 0, end: 1).animate(
+//           CurvedAnimation(parent: controller, curve: Curves.easeIn),
+//         ),
+//       );
+//       controller.forward();
+//     }
+
+//     _arrowController = AnimationController(
+//       vsync: this,
+//       duration: const Duration(milliseconds: 1200),
+//     );
+//     _arrowAnimation = Tween<double>(begin: 0, end: 1).animate(
+//       CurvedAnimation(parent: _arrowController, curve: Curves.easeInOut),
+//     );
+//     _headerController.forward();
+//     _arrowController.forward();
+//   }
+
+//   @override
+//   void dispose() {
+//     _headerController.dispose();
+//     _arrowController.dispose();
+//     for (var controller in _stepControllers) {
+//       controller.dispose();
+//     }
+//     super.dispose();
+//   }
+
+//   void _replayAnimations() {
+//     _headerController.reset();
+//     _arrowController.reset();
+//     for (var controller in _stepControllers) {
+//       controller.reset();
+//       controller.forward();
+//     }
+//     _headerController.forward();
+//     _arrowController.forward();
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     final screenWidth = MediaQuery.of(context).size.width;
+//     final isLargeScreen = screenWidth > 600;
+
+//     return Theme(
+//       data: ThemeData(
+//         primaryColor: _primaryColor,
+//         colorScheme:
+//             ColorScheme.fromSwatch().copyWith(secondary: _accentColor),
+//         scaffoldBackgroundColor: _backgroundColor,
+//       ),
+//       child: Scaffold(
+//         appBar: _buildAppBar(isLargeScreen),
+//         body: SafeArea(
+//           child: SingleChildScrollView(
+//             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+//             child: Column(
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               children: [
+//                 _buildHeader(isLargeScreen),
+//                 const SizedBox(height: 24),
+//                 AnimatedBuilder(
+//                   animation: _arrowAnimation,
+//                   builder: (context, _) => CustomPaint(
+//                     painter:
+//                         ArrowPainter(_steps.length, screenWidth, _arrowAnimation.value),
+//                     child: Column(
+//                       children: _steps.asMap().entries.map((entry) {
+//                         return _buildStepCard(
+//                             entry.key, entry.value, isLargeScreen);
+//                       }).toList(),
+//                     ),
+//                   ),
+//                 )
+//               ],
+//             ),
+//           ),
+//         ),
+//         floatingActionButton: _buildReplayButton(),
+//       ),
+//     );
+//   }
+
+//   PreferredSizeWidget _buildAppBar(bool isLargeScreen) {
+//     return AppBar(
+//       title: Text(
+//         'PayGlocal Payment Flow',
+//         style: GoogleFonts.poppins(
+//           fontSize: isLargeScreen ? 24 : 20,
+//           fontWeight: FontWeight.w600,
+//           color: Colors.white,
+//         ),
+//       ),
+//       backgroundColor: _primaryColor,
+//       elevation: 2,
+//       shadowColor: Colors.black.withOpacity(0.2),
+//     );
+//   }
+
+//   Widget _buildHeader(bool isLargeScreen) {
+//     return FadeTransition(
+//       opacity: _headerOpacity,
+//       child: Container(
+//         padding: const EdgeInsets.all(16),
+//         decoration: BoxDecoration(
+//           color: Colors.white,
+//           borderRadius: BorderRadius.circular(12),
+//           boxShadow: [
+//             BoxShadow(
+//               color: Colors.black.withOpacity(0.1),
+//               blurRadius: 8,
+//               offset: const Offset(0, 4),
+//             ),
+//           ],
+//         ),
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             Text(
+//               'Payment Flow Visualizer',
+//               style: GoogleFonts.poppins(
+//                 fontSize: isLargeScreen ? 28 : 24,
+//                 fontWeight: FontWeight.bold,
+//                 color: _primaryColor,
+//               ),
+//             ),
+//             const SizedBox(height: 8),
+//             Text(
+//               'An interactive guide to the PayGlocal payment process, from user action to server response.',
+//               style: GoogleFonts.poppins(
+//                 fontSize: isLargeScreen ? 16 : 14,
+//                 color: _textColor,
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _buildStepCard(
+//       int index, Map<String, String> step, bool isLargeScreen) {
+//     return SlideTransition(
+//       position: _stepOffsets[index],
+//       child: FadeTransition(
+//         opacity: _stepOpacities[index],
+//         child: Transform.scale(
+//           scale: _stepScales[index].value,
+//           child: Column(
+//             children: [
+//               Card(
+//                 elevation: 4,
+//                 shape: RoundedRectangleBorder(
+//                     borderRadius: BorderRadius.circular(12)),
+//                 margin: const EdgeInsets.symmetric(vertical: 8),
+//                 child: ExpansionTile(
+//                   tilePadding:
+//                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+//                   childrenPadding: const EdgeInsets.all(16),
+//                   leading: CircleAvatar(
+//                     backgroundColor: _accentColor.withOpacity(0.1),
+//                     child: Text(
+//                       '${index + 1}',
+//                       style: GoogleFonts.poppins(
+//                         fontSize: 16,
+//                         fontWeight: FontWeight.bold,
+//                         color: _accentColor,
+//                       ),
+//                     ),
+//                   ),
+//                   title: Text(
+//                     step['title']!,
+//                     style: GoogleFonts.poppins(
+//                       fontSize: isLargeScreen ? 18 : 16,
+//                       fontWeight: FontWeight.w600,
+//                       color: _primaryColor,
+//                     ),
+//                   ),
+//                   subtitle: Padding(
+//                     padding: const EdgeInsets.only(top: 8),
+//                     child: Text(
+//                       step['description']!,
+//                       style: GoogleFonts.poppins(
+//                         fontSize: isLargeScreen ? 14 : 12,
+//                         color: _textColor,
+//                       ),
+//                     ),
+//                   ),
+//                   children: [
+//                     SelectableText(
+//                       step['details']!,
+//                       style: GoogleFonts.robotoMono(
+//                         fontSize: isLargeScreen ? 14 : 12,
+//                         color: _textColor,
+//                       ),
+//                     ),
+//                     if (step['code'] != null) ...[
+//                       const SizedBox(height: 16),
+//                       Container(
+//                         padding: const EdgeInsets.all(12),
+//                         decoration: BoxDecoration(
+//                           color: _backgroundColor,
+//                           borderRadius: BorderRadius.circular(8),
+//                         ),
+//                         child: SelectableText(
+//                           step['code']!,
+//                           style: GoogleFonts.robotoMono(
+//                             fontSize: isLargeScreen ? 13 : 11,
+//                             color: _textColor,
+//                           ),
+//                         ),
+//                       ),
+//                     ],
+//                   ],
+//                   onExpansionChanged: (expanded) {
+//                     setState(() {
+//                       _expandedStates[index] = expanded;
+//                     });
+//                   },
+//                 ),
+//               ),
+//               if (index < _steps.length - 1) const SizedBox(height: 40),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _buildReplayButton() {
+//     return FloatingActionButton(
+//       onPressed: _replayAnimations,
+//       backgroundColor: _accentColor,
+//       tooltip: 'Replay Animations',
+//       child: const Icon(Icons.replay, color: Colors.white),
+//     );
+//   }
+// }
+
+// class ArrowPainter extends CustomPainter {
+//   final int stepCount;
+//   final double screenWidth;
+//   final double progress;
+
+//   ArrowPainter(this.stepCount, this.screenWidth, this.progress);
+
+//   @override
+//   void paint(Canvas canvas, Size size) {
+//     final paint = Paint()
+//       ..color = _FlowVisualizerPageState._textColor.withOpacity(0.5)
+//       ..style = PaintingStyle.stroke
+//       ..strokeWidth = 2;
+
+//     const stepHeight = 80.0;
+//     const spacing = 40.0;
+//     const arrowHeadSize = 8.0;
+
+//     for (var i = 0; i < stepCount - 1; i++) {
+//       final startY = (i + 1) * (stepHeight + spacing) - spacing / 2;
+//       final endY = (i + 1) * (stepHeight + spacing) + spacing / 2;
+//       final currentProgress = (i + 1) / stepCount;
+//       if (progress >= currentProgress) {
+//         canvas.drawLine(
+//           Offset(screenWidth / 2, startY),
+//           Offset(screenWidth / 2, endY),
+//           paint,
+//         );
+//         final path = Path()
+//           ..moveTo(screenWidth / 2 - arrowHeadSize, endY - arrowHeadSize)
+//           ..lineTo(screenWidth / 2, endY)
+//           ..lineTo(screenWidth / 2 + arrowHeadSize, endY - arrowHeadSize)
+//           ..close();
+//         canvas.drawPath(path, paint..style = PaintingStyle.fill);
+//       }
+//     }
+//   }
+
+//   @override
+//   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+// }
